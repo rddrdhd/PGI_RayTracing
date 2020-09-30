@@ -138,21 +138,37 @@ Color4f Raytracer::get_pixel( const int x, const int y, const float t )
 	if (ray_hit.hit.geomID != RTC_INVALID_GEOMETRY_ID) // we hit something
 	{
 		RTCGeometry geometry = rtcGetGeometry(scene_, ray_hit.hit.geomID);
-	
-	// get interpolated normal
-		Normal3f normal;
-		rtcInterpolate0(geometry, ray_hit.hit.primID, ray_hit.hit.u, ray_hit.hit.v,
-			RTC_BUFFER_TYPE_VERTEX_ATTRIBUTE, 0, &normal.x, 3);
-		float r = (normal.x + 1)/2;
-		float g = (normal.y + 1)/2;
-		float b = (normal.z + 1)/2;
+
+		Material* material = (Material*)(rtcGetGeometryUserData(geometry));
 		
-	// and texture coordinates
+		float mr = material->diffuse.x;
+		float mg = material->diffuse.y;
+		float mb = material->diffuse.z;
+		
 		Coord2f tex_coord;
 		rtcInterpolate0(geometry, ray_hit.hit.primID, ray_hit.hit.u, ray_hit.hit.v,
 			RTC_BUFFER_TYPE_VERTEX_ATTRIBUTE, 1, &tex_coord.u, 2);
 
-		return Color4f{ r, g, b, 1.0f };
+	// get interpolated normal
+		Normal3f normal;
+		rtcInterpolate0(geometry, ray_hit.hit.primID, ray_hit.hit.u, ray_hit.hit.v,
+			RTC_BUFFER_TYPE_VERTEX_ATTRIBUTE, 0, &normal.x, 3);
+
+		Vector3 normal_vector(normal.x, normal.y, normal.z);
+		normal_vector.Normalize();
+		//https://matrix.cs.vsb.cz/_matrix/media/r0/download/matrix.cs.vsb.cz/uguivDUHiytcFsDysuChMeAr
+		float nx = ((normal_vector.x + 1)/2);
+		float ny = ((normal_vector.y + 1)/2);
+		float nz = ((normal_vector.z + 1)/2);
+		
+		Vector3 m(mr, mg, mb);
+		Vector3 n(nx, ny, nz);
+
+		// TODO neco s dot productem?
+
+	// and texture coordinates
+	
+		return Color4f{ n.x, n.y, n.z, 1.0f };
 	}
 	return Color4f{ 0.1f, 0.1f, 0.1f, 1.0f };
 }
