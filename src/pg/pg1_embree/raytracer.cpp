@@ -143,17 +143,16 @@ Color4f Raytracer::get_pixel( const int x, const int y, const float t )
 		Normal3f normal;
 		rtcInterpolate0(geometry, ray_hit.hit.primID, ray_hit.hit.u, ray_hit.hit.v,
 			RTC_BUFFER_TYPE_VERTEX_ATTRIBUTE, 0, &normal.x, 3);
+		float r = (normal.x + 1)/2;
+		float g = (normal.y + 1)/2;
+		float b = (normal.z + 1)/2;
 		
 	// and texture coordinates
 		Coord2f tex_coord;
 		rtcInterpolate0(geometry, ray_hit.hit.primID, ray_hit.hit.u, ray_hit.hit.v,
 			RTC_BUFFER_TYPE_VERTEX_ATTRIBUTE, 1, &tex_coord.u, 2);
-		
-		//cout << ray_hit.hit.primID << ", " << ray_hit.hit.geomID<< endl;
-		
 
-
-		return Color4f{ 0.9f, 0.9f, 0.9f, 1.0f };
+		return Color4f{ r, g, b, 1.0f };
 	}
 	return Color4f{ 0.1f, 0.1f, 0.1f, 1.0f };
 }
