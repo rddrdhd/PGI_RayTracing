@@ -140,30 +140,44 @@ Color4f Raytracer::get_pixel( const int x, const int y, const float t )
 		RTCGeometry geometry = rtcGetGeometry(scene_, ray_hit.hit.geomID);
 
 		Material* material = (Material*)(rtcGetGeometryUserData(geometry));
-		
+
 		float mr = material->diffuse.x;
 		float mg = material->diffuse.y;
 		float mb = material->diffuse.z;
-		
+
 		Coord2f tex_coord;
 		rtcInterpolate0(geometry, ray_hit.hit.primID, ray_hit.hit.u, ray_hit.hit.v,
 			RTC_BUFFER_TYPE_VERTEX_ATTRIBUTE, 1, &tex_coord.u, 2);
 
-	// get interpolated normal
+		// get interpolated normal
 		Normal3f normal;
 		rtcInterpolate0(geometry, ray_hit.hit.primID, ray_hit.hit.u, ray_hit.hit.v,
 			RTC_BUFFER_TYPE_VERTEX_ATTRIBUTE, 0, &normal.x, 3);
 
 		Vector3 normal_vector(normal.x, normal.y, normal.z);
 		normal_vector.Normalize();
+
+		Vector3 dir(primary_ray.dir_x, primary_ray.dir_y, primary_ray.dir_z);
+		dir.Normalize();
+
+		// kontrola orientace normal
+		if ( normal_vector.DotProduct(dir) > 0 ) 
+		{
+			normal_vector = -normal_vector;
+		}
+		
+		
+
 		//https://matrix.cs.vsb.cz/_matrix/media/r0/download/matrix.cs.vsb.cz/uguivDUHiytcFsDysuChMeAr
-		float nx = ((normal_vector.x + 1)/2);
-		float ny = ((normal_vector.y + 1)/2);
-		float nz = ((normal_vector.z + 1)/2);
+		float nx =(((normal_vector.x) + 1)/2);
+		float ny =(((normal_vector.y) + 1)/2);
+		float nz =(((normal_vector.z) + 1)/2);
+
 		
 		Vector3 m(mr, mg, mb);
 		Vector3 n(nx, ny, nz);
-
+		//http://www.opengl-tutorial.org/beginners-tutorials/tutorial-8-basic-shading/
+		// beware fo the sign
 		// TODO neco s dot productem?
 
 	// and texture coordinates
