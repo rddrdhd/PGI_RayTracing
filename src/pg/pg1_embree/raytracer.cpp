@@ -41,9 +41,15 @@ int Raytracer::ReleaseDeviceAndScene()
 	return S_OK;
 }
 
-void Raytracer::LoadScene( const std::string file_name )
+
+void Raytracer::LoadScene(const std::string file_name)
 {
-	const int no_surfaces = LoadOBJ( file_name.c_str(), surfaces_, materials_ );
+	const int no_surfaces = LoadOBJ(file_name.c_str(), surfaces_, materials_);
+
+	Vector3 l(1, 1, 1);
+	LightSource light(Vector3(0, 0, 0), l, l, l);
+
+	lights_.push_back(light);
 
 	// surfaces loop
 	for ( auto surface : surfaces_ )
@@ -105,19 +111,12 @@ void Raytracer::LoadScene( const std::string file_name )
 	rtcCommitScene( scene_ );
 }
 
-Color4f Raytracer::get_pixel( const int x, const int y, const float t )
-{
-	// TODO generate primary ray and perform ray cast on the scene
-	RTCRay primary_ray = camera_.GenerateRay(x, y);
-/*
-	Vector3 d_w(primary_ray.dir_x, primary_ray.dir_y, primary_ray.dir_z);
-	d_w.Normalize();
-	Vector3 o(primary_ray.dir_x, primary_ray.dir_y, primary_ray.dir_z);
-	Vector3 r_t = o + (d_w * t);
-*/
-	//cout << "r(t) x: " << r_t.x << ", y: " << r_t.y << ", z: " << r_t.z << "; \n";
+Color4f Raytracer::trace(RTCRay ray, int level) {
+	// omezeni zanoreni
+	if(level>=10){
+		return Color4f{ 0.1f, 0.1f, 0.1f, 1.0f };
+	}
 
-	// setup a hit
 	RTCHit hit;
 	hit.geomID = RTC_INVALID_GEOMETRY_ID;
 	hit.primID = RTC_INVALID_GEOMETRY_ID;
@@ -127,7 +126,7 @@ Color4f Raytracer::get_pixel( const int x, const int y, const float t )
 
 	// merge ray and hit structures
 	RTCRayHit ray_hit;
-	ray_hit.ray = primary_ray;
+	ray_hit.ray = ray;
 	ray_hit.hit = hit;
 
 	// intersect ray with the scene
@@ -138,53 +137,70 @@ Color4f Raytracer::get_pixel( const int x, const int y, const float t )
 	if (ray_hit.hit.geomID != RTC_INVALID_GEOMETRY_ID) // we hit something
 	{
 		RTCGeometry geometry = rtcGetGeometry(scene_, ray_hit.hit.geomID);
+		Normal3f normal;
+
+		// get interpolated normal
+		rtcInterpolate0(geometry, ray_hit.hit.primID, ray_hit.hit.u, ray_hit.hit.v, RTC_BUFFER_TYPE_VERTEX_ATTRIBUTE, 0, &normal.x, 3);
+
+		Vector3 normal_vector(normal.x, normal.y, normal.z);
+		Vector3 dir(ray.dir_x, ray.dir_y, ray.dir_z);
+
+		normal_vector.Normalize();
+		dir.Normalize();
+
+		if (normal_vector.DotProduct(dir) > 0) { normal_vector = -normal_vector; } // kontrola orientace normal
+		
+		float nx = (((normal_vector.x) + 1) / 2);
+		float ny = (((normal_vector.y) + 1) / 2);
+		float nz = (((normal_vector.z) + 1) / 2);
 
 		Material* material = (Material*)(rtcGetGeometryUserData(geometry));
-
 		float mr = material->diffuse.x;
 		float mg = material->diffuse.y;
 		float mb = material->diffuse.z;
 
-		Coord2f tex_coord;
-		rtcInterpolate0(geometry, ray_hit.hit.primID, ray_hit.hit.u, ray_hit.hit.v,
-			RTC_BUFFER_TYPE_VERTEX_ATTRIBUTE, 1, &tex_coord.u, 2);
-
-		// get interpolated normal
-		Normal3f normal;
-		rtcInterpolate0(geometry, ray_hit.hit.primID, ray_hit.hit.u, ray_hit.hit.v,
-			RTC_BUFFER_TYPE_VERTEX_ATTRIBUTE, 0, &normal.x, 3);
-
-		Vector3 normal_vector(normal.x, normal.y, normal.z);
-		normal_vector.Normalize();
-
-		Vector3 dir(primary_ray.dir_x, primary_ray.dir_y, primary_ray.dir_z);
-		dir.Normalize();
-
-		// kontrola orientace normal
-		if ( normal_vector.DotProduct(dir) > 0 ) 
-		{
-			normal_vector = -normal_vector;
+		if (true) {
+			for (auto light : this->lights_) {
+				RTCRay lightRay = light.GenerateRay(ray_hit.hit.Ng_x, ray_hit.hit.Ng_y, ray_hit.hit.Ng_z);
+			}
 		}
-		
-		
-
-		//https://matrix.cs.vsb.cz/_matrix/media/r0/download/matrix.cs.vsb.cz/uguivDUHiytcFsDysuChMeAr
-		float nx =(((normal_vector.x) + 1)/2);
-		float ny =(((normal_vector.y) + 1)/2);
-		float nz =(((normal_vector.z) + 1)/2);
-
-		
-		Vector3 m(mr, mg, mb);
+		//Vector3 m(mr, mg, mb);
 		Vector3 n(nx, ny, nz);
 		//http://www.opengl-tutorial.org/beginners-tutorials/tutorial-8-basic-shading/
-		// beware fo the sign
-		// TODO neco s dot productem?
-
-	// and texture coordinates
-	
 		return Color4f{ n.x, n.y, n.z, 1.0f };
 	}
 	return Color4f{ 0.1f, 0.1f, 0.1f, 1.0f };
+}
+Color4f Raytracer::get_pixel( const int x, const int y, const float t )
+{
+	// generate primary ray and perform ray cast on the scene
+	RTCRay primary_ray = camera_.GenerateRay(x, y);
+	return trace(primary_ray, 1);
+}
+
+bool Raytracer::isBlocked(LightSource light, RTCRayHit ray_hit)
+{
+	RTCHit hit;
+	hit.geomID = RTC_INVALID_GEOMETRY_ID;
+	hit.primID = RTC_INVALID_GEOMETRY_ID;
+	hit.Ng_x = 0.0f; // geometry normal
+	hit.Ng_y = 0.0f;
+	hit.Ng_z = 0.0f;
+
+	// merge ray and hit structures
+	RTCRayHit ray_hit;
+	ray_hit.ray = ray;
+	ray_hit.hit = hit;
+
+	// intersect ray with the scene
+	RTCIntersectContext context;
+	rtcInitIntersectContext(&context);
+	rtcIntersect1(scene_, &context, &ray_hit);
+
+	if (ray_hit.hit.geomID != RTC_INVALID_GEOMETRY_ID) // we hit something
+	{
+	}
+	return false;
 }
 
 int Raytracer::Ui()

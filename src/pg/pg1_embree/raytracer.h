@@ -2,6 +2,7 @@
 #include "simpleguidx11.h"
 #include "surface.h"
 #include "camera.h"
+#include "LightSource.h"
 
 /*! \class Raytracer
 \brief General ray tracer class.
@@ -24,13 +25,16 @@ public:
 
 	void LoadScene( const std::string file_name );
 
+	Color4f trace( RTCRay ray, int level );
 	Color4f get_pixel( const int x, const int y, const float t = 0.0f ) override;
+	Vector3 getWhittedIlumination();
 
 	int Ui();
 
 private:
 	std::vector<Surface *> surfaces_;
 	std::vector<Material *> materials_;
+	std::vector<LightSource> lights_;
 
 	RTCDevice device_;
 	RTCScene scene_;
