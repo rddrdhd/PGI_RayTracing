@@ -24,3 +24,6 @@ RTCRay LightSource::GenerateRay(const float x, const float y, const float z) con
 	return RTCRay();
 }
 
+bool LightSource::Illuminates(RTCRayHit ray_hit){
+	return true;
+}

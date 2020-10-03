@@ -28,6 +28,7 @@ public:
 	Color4f trace( RTCRay ray, int level );
 	Color4f get_pixel( const int x, const int y, const float t = 0.0f ) override;
 	Vector3 getWhittedIlumination();
+	bool isIlluminated(LightSource light, RTCRayHit ray_hit);
 
 	int Ui();
 
