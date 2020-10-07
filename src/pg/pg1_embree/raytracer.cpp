@@ -48,10 +48,16 @@ void Raytracer::LoadScene(const std::string file_name)
 {
 	const int no_surfaces = LoadOBJ(file_name.c_str(), surfaces_, materials_);
 
-	Vector3 l(1, 1, 1);
-	LightSource light(Vector3(10, 0, 0), l, l, l);
+	Vector3 red(1, 0.2, 0.2);
+	Vector3 green(0.2, 1, 0.2);
+	Vector3 blue(0.2, 0.2, 1);
+	LightSource red_light(Vector3(-30,0,0), red, red, red);
+	LightSource green_light(Vector3(0,80,0), green, green, green);
+	LightSource blue_light(Vector3(0,0,-50), blue, blue, blue);
 
-	lights_.push_back(light);
+	lights_.push_back(red_light);
+	lights_.push_back(green_light);
+	lights_.push_back(blue_light);
 
 	// surfaces loop
 	for ( auto surface : surfaces_ )
@@ -194,19 +200,50 @@ Color4f Raytracer::trace(RTCRay ray, int level) {
 		float mb = material->diffuse.z;
 		Vector3 m(mr, mg, mb);
 
-		if (true) {
+		float r = 0;
+		float g = 0;
+		float b = 0;
+
+
 			for (LightSource light : this->lights_) {
+				normal_vector.Normalize();
 				// vypocitam misto hitu
 				Vector3 p = Vector3(ray_hit.ray.org_x, ray_hit.ray.org_y, ray_hit.ray.org_z) +
 					Vector3(ray_hit.ray.dir_x, ray_hit.ray.dir_y, ray_hit.ray.dir_z) * ray_hit.ray.tfar;
-
-				RTCRay lightRay = light.GenerateRay(p.x, p.y, p.z);
+				//vypocitam vektor z hitu do svetla
+				Vector3 l(p.x - light.position_.x, p.y - light.position_.y, p.z - light.position_.z);
+				l.Normalize();
+				// vypocitam vektor z hitu do oka
+				Vector3 v(ray.org_x - ray.dir_x, ray.org_y - ray.dir_y, ray.org_z - ray.dir_z);
+				v.Normalize();
+				Vector3 l_r = 2*(normal_vector.DotProduct(l))*normal_vector-l;
+				l_r.Normalize();
 				if (!isIlluminated(light, Vector3(p.x, p.y, p.z))) {
-					return BACKGROUND_COLOR; //TODO
+					double gamma = material->shininess;
+
+					double i_d = light.diffuse_.x;
+					double m_d = material->diffuse.x;
+					double i_s = light.spectular_.x;
+					double m_s = material->specular.x;
+					r += (i_d*m_d * (normal_vector.DotProduct(l)) + i_s*m_s*(pow(v.DotProduct(l_r),gamma)));
+
+					i_d = light.diffuse_.y;
+					m_d = material->diffuse.y;
+					i_s = light.spectular_.y;
+					m_s = material->specular.y;
+					g += (i_d*m_d * (normal_vector.DotProduct(l)) + i_s*m_s*(pow(v.DotProduct(l_r),gamma)));
+
+					i_d = light.diffuse_.z;
+					m_d = material->diffuse.z;
+					i_s = light.spectular_.z;
+					m_s = material->specular.z;
+					b += (i_d*m_d * (normal_vector.DotProduct(l)) + i_s*m_s*(pow(v.DotProduct(l_r),gamma)));
+					
 				}
 			}
-		}
-		return Color4f{ m.x, m.y, m.z, 1.0f };
+			Vector3 ambient = material->ambient * 0.5;
+		return Color4f{ r+ambient.x, g+ambient.y, b+ambient.z, 1.0f };
+		//return Color4f{ m.x, m.y, m.z, 1.0f };
 	}
 	return BACKGROUND_COLOR;
 }
