@@ -65,3 +65,13 @@ RTCRay Camera::GenerateRay( const float x_i, const float y_i ) const
 	
 	return ray;
 }
+
+Vector3 Camera::get_origin()
+{
+	return this->view_from_;
+}
+
+Vector3 Camera::get_direction()
+{
+	return this->view_at_;
+}
