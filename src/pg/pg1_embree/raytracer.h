@@ -34,6 +34,7 @@ public:
 
 
 	RTCRay get_refraction_ray(Vector3 direction, Vector3 normal, float iorFrom, float iorTo, Vector3 hit_point);
+	RTCRay get_reflection_ray(Vector3 direction, Vector3 normal, Vector3 hit_point);
 
 
 private:
