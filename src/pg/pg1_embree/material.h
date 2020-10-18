@@ -97,6 +97,7 @@ public:
 	Vector3 ambient; /*!< RGB barva prostøedí \f$\left<0, 1\right>^3\f$. */
 	Vector3 diffuse; /*!< RGB barva rozptylu \f$\left<0, 1\right>^3\f$. */
 	Vector3 specular; /*!< RGB barva odrazu \f$\left<0, 1\right>^3\f$. */
+	int type;
 
 	Vector3 emission; /*!< RGB barva emise \f$\left<0, 1\right>^3\f$. */
 

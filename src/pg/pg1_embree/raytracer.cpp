@@ -156,11 +156,39 @@ bool Raytracer::isIlluminated(LightSource light, Vector3 hit_position)
 	return (light_ray_hit.hit.geomID != RTC_INVALID_GEOMETRY_ID);
 }
 
-Color4f Raytracer::trace(RTCRay ray, int level) {
+RTCRay get_refraction_ray(Vector3 direction, Vector3 normal, float iorFrom, float iorTo, Vector3 hit_point)
+{
+	RTCRay refraction_ray;
+	direction.Normalize();
+	normal.Normalize();
+	float n1_n2 = iorFrom / iorTo;
+	Vector3 refraction_direction = (n1_n2 * direction) - (n1_n2 * (direction.DotProduct(normal)) + sqrt(1 - pow(n1_n2, 2) * (1 - pow(direction.DotProduct(normal), 2)))) * normal;
+
+	refraction_ray.org_x = hit_point.x;
+	refraction_ray.org_y = hit_point.y;
+	refraction_ray.org_z = hit_point.z;
+
+	refraction_ray.dir_x = refraction_direction.x;
+	refraction_ray.dir_y = refraction_direction.y;
+	refraction_ray.dir_z = refraction_direction.z;
+
+	refraction_ray.tnear = FLT_MIN;
+	refraction_ray.tfar = FLT_MAX;
+	refraction_ray.time = 0.0f;
+
+	refraction_ray.mask = 0; // can be used to mask out some geometries for some rays
+	refraction_ray.id = 0; // identify a ray inside a callback function
+	refraction_ray.flags = 0; // reserved
+
+	return refraction_ray;
+}
+
+
+Color4f Raytracer::trace(RTCRay ray, int level, float ior ) {
 	// omezeni zanoreni
 	if(level>=10){
 		// TODO!
-		return BACKGROUND_COLOR;
+		return Color4f{1,1,1,1};
 	}
 
 	RTCHit hit;
@@ -192,68 +220,87 @@ Color4f Raytracer::trace(RTCRay ray, int level) {
 		Material* material = (Material*)(rtcGetGeometryUserData(geometry));
 		Vector3 normal_vector(normal.x, normal.y, normal.z);
 
-		normal_vector.Normalize();
-		direction_vector.Normalize();
+		// vypocitam misto hitu
+		Vector3 hit_point = Vector3(ray_hit.ray.org_x, ray_hit.ray.org_y, ray_hit.ray.org_z) +
+			Vector3(ray_hit.ray.dir_x, ray_hit.ray.dir_y, ray_hit.ray.dir_z) * ray_hit.ray.tfar;
 
-		if (normal_vector.DotProduct(direction_vector) > 0) {
-			// fix orientace normal
-			normal_vector = -normal_vector; 
-		} 
+
+		RTCRay reflection_ray;
+		RTCRay refraction_ray;
+
+		//Vector3 refraction_direction = getRefractedVector(direction_vector, normal_vector, ior, material->ior);
 		
-		/*
-		// abchom mohli promitnout normaly jako barvy
-		float nx = (((normal_vector.x) + 1) / 2);
-		float ny = (((normal_vector.y) + 1) / 2);
-		float nz = (((normal_vector.z) + 1) / 2);
-		Vector3 n(nx, ny, nz);*/
+		switch (material->type) {
+		case 4: //sklo
+			reflection_ray.org_x = hit_point.x;
+			reflection_ray.org_y = hit_point.y;
+			reflection_ray.org_z = hit_point.z;
 
-		float r = 0;
-		float g = 0;
-		float b = 0;
-
-		for (LightSource light : this->lights_) {
-			// vypocitam misto hitu
-			Vector3 hit_point = Vector3(ray_hit.ray.org_x, ray_hit.ray.org_y, ray_hit.ray.org_z) +
-				Vector3(ray_hit.ray.dir_x, ray_hit.ray.dir_y, ray_hit.ray.dir_z) * ray_hit.ray.tfar;
+			RTCRay refraction_ray = get_refraction_ray(direction_vector, normal_vector, ior, material->ior, hit_point);
 			
-			if (isIlluminated(light, Vector3(hit_point.x, hit_point.y, hit_point.z))) {
-				// TODO!
-				//if (material->diffuse.z < 0.01) trace(ray, 2);
-				normal_vector.Normalize();
+			trace(refraction_ray, ++level, material->ior);
+			break;
+		default:		
+			normal_vector.Normalize();
+			direction_vector.Normalize();
 
-				//vypocitam vektor z hitu do svetla
-				Vector3 l(hit_point.x - light.position_.x, hit_point.y - light.position_.y, hit_point.z - light.position_.z);
-				l.Normalize();
-				// vypocitam vektor z hitu do oka
-				Vector3 v(ray.org_x - ray.dir_x, ray.org_y - ray.dir_y, ray.org_z - ray.dir_z);
-				v.Normalize();
-				Vector3 l_r = 2 * (normal_vector.DotProduct(l)) * normal_vector - l;
-				l_r.Normalize();
-				double gamma = material->shininess;
-
-				double i_d = light.diffuse_.x;
-				double m_d = material->diffuse.x;
-				double i_s = light.spectular_.x;
-				double m_s = material->specular.x;
-				r += (i_d*m_d * (normal_vector.DotProduct(l)) + i_s*m_s*(pow(v.DotProduct(l_r),gamma)));
-
-				i_d = light.diffuse_.y;
-				m_d = material->diffuse.y;
-				i_s = light.spectular_.y;
-				m_s = material->specular.y;
-				g += (i_d*m_d * (normal_vector.DotProduct(l)) + i_s*m_s*(pow(v.DotProduct(l_r),gamma)));
-
-				i_d = light.diffuse_.z;
-				m_d = material->diffuse.z;
-				i_s = light.spectular_.z;
-				m_s = material->specular.z;
-				b += (i_d*m_d * (normal_vector.DotProduct(l)) + i_s*m_s*(pow(v.DotProduct(l_r),gamma)));
-					
+			if (normal_vector.DotProduct(direction_vector) > 0) {
+				// fix orientace normal
+				normal_vector = -normal_vector;
 			}
+
+			/*
+			// abchom mohli promitnout normaly jako barvy
+			float nx = (((normal_vector.x) + 1) / 2);
+			float ny = (((normal_vector.y) + 1) / 2);
+			float nz = (((normal_vector.z) + 1) / 2);
+			Vector3 n(nx, ny, nz);*/
+
+			float r = 0;
+			float g = 0;
+			float b = 0;
+
+			for (LightSource light : this->lights_) {
+
+				if (isIlluminated(light, Vector3(hit_point.x, hit_point.y, hit_point.z))) {
+					// TODO!
+					//if (material->diffuse.z < 0.01) trace(ray, 2);
+
+					//vypocitam vektor z hitu do svetla
+					Vector3 l(hit_point.x - light.position_.x, hit_point.y - light.position_.y, hit_point.z - light.position_.z);
+					l.Normalize();
+					// vypocitam vektor z hitu do oka
+					Vector3 v(ray.org_x - ray.dir_x, ray.org_y - ray.dir_y, ray.org_z - ray.dir_z);
+					v.Normalize();
+					Vector3 l_r = 2 * (normal_vector.DotProduct(l)) * normal_vector - l;
+					l_r.Normalize();
+					double gamma = material->shininess;
+
+					double i_d = light.diffuse_.x;
+					double m_d = material->diffuse.x;
+					double i_s = light.spectular_.x;
+					double m_s = material->specular.x;
+					r += (i_d * m_d * (normal_vector.DotProduct(l)) + i_s * m_s * (pow(v.DotProduct(l_r), gamma)));
+
+					i_d = light.diffuse_.y;
+					m_d = material->diffuse.y;
+					i_s = light.spectular_.y;
+					m_s = material->specular.y;
+					g += (i_d * m_d * (normal_vector.DotProduct(l)) + i_s * m_s * (pow(v.DotProduct(l_r), gamma)));
+
+					i_d = light.diffuse_.z;
+					m_d = material->diffuse.z;
+					i_s = light.spectular_.z;
+					m_s = material->specular.z;
+					b += (i_d * m_d * (normal_vector.DotProduct(l)) + i_s * m_s * (pow(v.DotProduct(l_r), gamma)));
+
+				}
+			}
+
+			Vector3 ambient = material->ambient * 0.5;
+			return Color4f{ r + ambient.x, g + ambient.y, b + ambient.z, 1.0f };
 		}
 
-		Vector3 ambient = material->ambient * 0.5;
-		return Color4f{ r+ambient.x, g+ambient.y, b+ambient.z, 1.0f };
 	}
 	//Color4f background = background_.get_texel(direction_vector);
 	return BACKGROUND_COLOR ;
@@ -263,7 +310,7 @@ Color4f Raytracer::get_pixel( const int x, const int y, const float t )
 {
 	// generate primary ray and perform ray cast on the scene
 	RTCRay primary_ray = camera_.GenerateRay(x, y);
-	return trace(primary_ray, 1);
+	return trace(primary_ray, 1, 1);
 }
 
 int Raytracer::Ui()
@@ -307,3 +354,9 @@ int Raytracer::Ui()
 
 	return 0;
 }
+
+RTCRay Raytracer::get_refraction_ray(Vector3 direction, Vector3 normal, float iorFrom, float iorTo, Vector3 hit_point)
+{
+	return RTCRay();
+}
+

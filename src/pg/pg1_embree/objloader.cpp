@@ -132,6 +132,14 @@ int LoadMTL( const char * file_name, const char * path, std::vector<Material *> 
 				{
 					sscanf( tmp, "%*s %f %f %f", &material->ambient.x, &material->ambient.y, &material->ambient.z );
 				}
+				if ( strstr( tmp, "shader" ) == tmp ) // type of material
+				{
+					sscanf( tmp, "%*s %d", &material->type);
+				}
+				if ( strstr( tmp, "Ni" ) == tmp ) // index lomu
+				{
+					sscanf( tmp, "%*s %f", &material->ior);
+				}
 				if ( strstr( tmp, "Kd" ) == tmp ) // diffuse color of the material
 				{
 					sscanf( tmp, "%*s %f %f %f", &material->diffuse.x, &material->diffuse.y, &material->diffuse.z );

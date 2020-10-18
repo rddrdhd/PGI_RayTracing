@@ -26,11 +26,15 @@ public:
 
 	void LoadScene( const std::string file_name );
 
-	Color4f trace( RTCRay ray, int level );
+	Color4f trace( RTCRay ray, int level, float ior );
 	Color4f get_pixel( const int x, const int y, const float t = 0.0f ) override;
 	bool isIlluminated(LightSource light, Vector3 hit_position);
 
 	int Ui();
+
+
+	RTCRay get_refraction_ray(Vector3 direction, Vector3 normal, float iorFrom, float iorTo, Vector3 hit_point);
+
 
 private:
 	std::vector<Surface *> surfaces_;

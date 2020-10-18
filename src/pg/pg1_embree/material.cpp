@@ -18,7 +18,7 @@ Material::Material()
 	reflectivity = static_cast<float>( 0.99 );
 	shininess = 1;
 
-	ior = -1;
+	ior = 1.5;
 
 	memset( textures_, 0, sizeof( *textures_ ) * NO_TEXTURES );
 
@@ -30,6 +30,8 @@ Material::Material( std::string & name, const Vector3 & ambient, const Vector3 &
 	const float shininess, const float ior, Texture ** textures, const int no_textures )
 {
 	name_ = name;
+
+	this->type = type;
 
 	this->ambient = ambient;
 	this->diffuse = diffuse;
