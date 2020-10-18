@@ -14,6 +14,7 @@
 class Texture
 {
 public:
+	Texture();
 	Texture( const char * file_name );
 	~Texture();
 

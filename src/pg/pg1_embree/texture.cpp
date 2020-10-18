@@ -1,6 +1,6 @@
 #include "stdafx.h"
 #include "texture.h"
-
+Texture::Texture() { }
 Texture::Texture( const char * file_name )
 {
 	// image format
@@ -54,7 +54,7 @@ Texture::Texture( const char * file_name )
 
 Texture::~Texture()
 {	
-	if ( data_ )
+	/*if ( data_ )
 	{
 		// free FreeImage's copy of the data
 		delete[] data_;
@@ -62,7 +62,7 @@ Texture::~Texture()
 		
 		width_ = 0;
 		height_ = 0;
-	}
+	}*/
 }
 
 Color3f Texture::get_texel( const float u, const float v ) const

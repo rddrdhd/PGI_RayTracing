@@ -46,18 +46,31 @@ int Raytracer::ReleaseDeviceAndScene()
 
 void Raytracer::LoadScene(const std::string file_name)
 {
+	//std::string path = "../../../data/PalmTrees/";
+	background_ = CubeMap(
+		"../../../data/PalmTrees/posz.jpg",
+		"../../../data/PalmTrees/negx.jpg",
+		"../../../data/PalmTrees/posx.jpg",
+		"../../../data/PalmTrees/negz.jpg", 
+		"../../../data/PalmTrees/posy.jpg", 
+		"../../../data/PalmTrees/negy.jpg");
+
 	const int no_surfaces = LoadOBJ(file_name.c_str(), surfaces_, materials_);
 
-	Vector3 red(1, 0.2, 0.2);
-	Vector3 green(0.2, 1, 0.2);
-	Vector3 blue(0.2, 0.2, 1);
-	LightSource red_light(Vector3(-30,0,0), red, red, red);
+	// add lights
+	Vector3 red(0.8, 0.2, 0.2);
+	Vector3 green(0.2, 0.8, 0.2);
+	Vector3 blue(0.2, 0.2, 0.8);
+	Vector3 white(1, 1, 1);
+	LightSource red_light(Vector3(-10,0,0), red, red, red);
 	LightSource green_light(Vector3(0,80,0), green, green, green);
 	LightSource blue_light(Vector3(0,0,-50), blue, blue, blue);
+	LightSource white_light(Vector3(10, 0, 0), white, white, white);
 
-	lights_.push_back(red_light);
-	lights_.push_back(green_light);
-	lights_.push_back(blue_light);
+	//lights_.push_back(red_light);
+	//lights_.push_back(green_light);
+	//lights_.push_back(blue_light);
+	lights_.push_back(white_light);
 
 	// surfaces loop
 	for ( auto surface : surfaces_ )
@@ -139,23 +152,20 @@ bool Raytracer::isIlluminated(LightSource light, Vector3 hit_position)
 	rtcInitIntersectContext(&context);
 	rtcIntersect1(scene_, &context, &light_ray_hit);
 
-	if (light_ray_hit.hit.geomID != RTC_INVALID_GEOMETRY_ID)
-	{
-		return false;
-	}
-	return true;
+	return (light_ray_hit.hit.geomID != RTC_INVALID_GEOMETRY_ID);
 }
 
 Color4f Raytracer::trace(RTCRay ray, int level) {
 	// omezeni zanoreni
 	if(level>=10){
+		// TODO!
 		return BACKGROUND_COLOR;
 	}
 
 	RTCHit hit;
 	hit.geomID = RTC_INVALID_GEOMETRY_ID;
 	hit.primID = RTC_INVALID_GEOMETRY_ID;
-	hit.Ng_x = 0.0f; // geometry normal
+	hit.Ng_x = 0.0f; 
 	hit.Ng_y = 0.0f;
 	hit.Ng_z = 0.0f;
 
@@ -188,63 +198,62 @@ Color4f Raytracer::trace(RTCRay ray, int level) {
 			normal_vector = -normal_vector; 
 		} 
 		
-
+		/*
 		// abchom mohli promitnout normaly jako barvy
 		float nx = (((normal_vector.x) + 1) / 2);
 		float ny = (((normal_vector.y) + 1) / 2);
 		float nz = (((normal_vector.z) + 1) / 2);
-		Vector3 n(nx, ny, nz);
-
-		float mr = material->diffuse.x;
-		float mg = material->diffuse.y;
-		float mb = material->diffuse.z;
-		Vector3 m(mr, mg, mb);
+		Vector3 n(nx, ny, nz);*/
 
 		float r = 0;
 		float g = 0;
 		float b = 0;
 
-
-			for (LightSource light : this->lights_) {
+		for (LightSource light : this->lights_) {
+			// vypocitam misto hitu
+			Vector3 hit_point = Vector3(ray_hit.ray.org_x, ray_hit.ray.org_y, ray_hit.ray.org_z) +
+				Vector3(ray_hit.ray.dir_x, ray_hit.ray.dir_y, ray_hit.ray.dir_z) * ray_hit.ray.tfar;
+			
+			if (isIlluminated(light, Vector3(hit_point.x, hit_point.y, hit_point.z))) {
+				// TODO!
+				//if (material->diffuse.z < 0.01) trace(ray, 2);
 				normal_vector.Normalize();
-				// vypocitam misto hitu
-				Vector3 p = Vector3(ray_hit.ray.org_x, ray_hit.ray.org_y, ray_hit.ray.org_z) +
-					Vector3(ray_hit.ray.dir_x, ray_hit.ray.dir_y, ray_hit.ray.dir_z) * ray_hit.ray.tfar;
+
 				//vypocitam vektor z hitu do svetla
-				Vector3 l(p.x - light.position_.x, p.y - light.position_.y, p.z - light.position_.z);
+				Vector3 l(hit_point.x - light.position_.x, hit_point.y - light.position_.y, hit_point.z - light.position_.z);
 				l.Normalize();
 				// vypocitam vektor z hitu do oka
 				Vector3 v(ray.org_x - ray.dir_x, ray.org_y - ray.dir_y, ray.org_z - ray.dir_z);
 				v.Normalize();
-				Vector3 l_r = 2*(normal_vector.DotProduct(l))*normal_vector-l;
+				Vector3 l_r = 2 * (normal_vector.DotProduct(l)) * normal_vector - l;
 				l_r.Normalize();
-				if (!isIlluminated(light, Vector3(p.x, p.y, p.z))) {
-					double gamma = material->shininess;
+				double gamma = material->shininess;
 
-					double i_d = light.diffuse_.x;
-					double m_d = material->diffuse.x;
-					double i_s = light.spectular_.x;
-					double m_s = material->specular.x;
-					r += (i_d*m_d * (normal_vector.DotProduct(l)) + i_s*m_s*(pow(v.DotProduct(l_r),gamma)));
+				double i_d = light.diffuse_.x;
+				double m_d = material->diffuse.x;
+				double i_s = light.spectular_.x;
+				double m_s = material->specular.x;
+				r += (i_d*m_d * (normal_vector.DotProduct(l)) + i_s*m_s*(pow(v.DotProduct(l_r),gamma)));
 
-					i_d = light.diffuse_.y;
-					m_d = material->diffuse.y;
-					i_s = light.spectular_.y;
-					m_s = material->specular.y;
-					g += (i_d*m_d * (normal_vector.DotProduct(l)) + i_s*m_s*(pow(v.DotProduct(l_r),gamma)));
+				i_d = light.diffuse_.y;
+				m_d = material->diffuse.y;
+				i_s = light.spectular_.y;
+				m_s = material->specular.y;
+				g += (i_d*m_d * (normal_vector.DotProduct(l)) + i_s*m_s*(pow(v.DotProduct(l_r),gamma)));
 
-					i_d = light.diffuse_.z;
-					m_d = material->diffuse.z;
-					i_s = light.spectular_.z;
-					m_s = material->specular.z;
-					b += (i_d*m_d * (normal_vector.DotProduct(l)) + i_s*m_s*(pow(v.DotProduct(l_r),gamma)));
+				i_d = light.diffuse_.z;
+				m_d = material->diffuse.z;
+				i_s = light.spectular_.z;
+				m_s = material->specular.z;
+				b += (i_d*m_d * (normal_vector.DotProduct(l)) + i_s*m_s*(pow(v.DotProduct(l_r),gamma)));
 					
-				}
 			}
-			Vector3 ambient = material->ambient * 0.5;
+		}
+
+		Vector3 ambient = material->ambient * 0.5;
 		return Color4f{ r+ambient.x, g+ambient.y, b+ambient.z, 1.0f };
-		//return Color4f{ m.x, m.y, m.z, 1.0f };
 	}
+
 	return BACKGROUND_COLOR;
 }
 

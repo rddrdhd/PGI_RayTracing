@@ -3,6 +3,7 @@
 #include "surface.h"
 #include "camera.h"
 #include "LightSource.h"
+#include "CubeMap.h"
 
 /*! \class Raytracer
 \brief General ray tracer class.
@@ -27,7 +28,6 @@ public:
 
 	Color4f trace( RTCRay ray, int level );
 	Color4f get_pixel( const int x, const int y, const float t = 0.0f ) override;
-	Vector3 getWhittedIlumination();
 	bool isIlluminated(LightSource light, Vector3 hit_position);
 
 	int Ui();
@@ -37,6 +37,7 @@ private:
 	std::vector<Material *> materials_;
 	std::vector<LightSource> lights_;
 
+	CubeMap background_;
 	RTCDevice device_;
 	RTCScene scene_;
 	Camera camera_;
