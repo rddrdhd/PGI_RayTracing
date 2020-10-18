@@ -37,7 +37,7 @@ private:
 	std::vector<Material *> materials_;
 	std::vector<LightSource> lights_;
 
-	CubeMap background_;
+	//CubeMap background_;
 	RTCDevice device_;
 	RTCScene scene_;
 	Camera camera_;

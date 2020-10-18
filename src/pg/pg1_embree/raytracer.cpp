@@ -14,6 +14,14 @@ Raytracer::Raytracer( const int width, const int height,
 	InitDeviceAndScene( config );
 
 	camera_ = Camera( width, height, fov_y, view_from, view_at );
+	/*
+	background_ = CubeMap(
+		"../../../data/PalmTrees/posz.jpg",
+		"../../../data/PalmTrees/negx.jpg",
+		"../../../data/PalmTrees/posx.jpg",
+		"../../../data/PalmTrees/negz.jpg",
+		"../../../data/PalmTrees/posy.jpg",
+		"../../../data/PalmTrees/negy.jpg");*/
 }
 
 Raytracer::~Raytracer()
@@ -47,13 +55,6 @@ int Raytracer::ReleaseDeviceAndScene()
 void Raytracer::LoadScene(const std::string file_name)
 {
 	//std::string path = "../../../data/PalmTrees/";
-	background_ = CubeMap(
-		"../../../data/PalmTrees/posz.jpg",
-		"../../../data/PalmTrees/negx.jpg",
-		"../../../data/PalmTrees/posx.jpg",
-		"../../../data/PalmTrees/negz.jpg", 
-		"../../../data/PalmTrees/posy.jpg", 
-		"../../../data/PalmTrees/negy.jpg");
 
 	const int no_surfaces = LoadOBJ(file_name.c_str(), surfaces_, materials_);
 
@@ -179,6 +180,8 @@ Color4f Raytracer::trace(RTCRay ray, int level) {
 	rtcInitIntersectContext(&context);
 	rtcIntersect1(scene_, &context, &ray_hit);
 
+	Vector3 direction_vector(ray.dir_x, ray.dir_y, ray.dir_z);
+
 	if (ray_hit.hit.geomID != RTC_INVALID_GEOMETRY_ID) // we hit something
 	{
 		RTCGeometry geometry = rtcGetGeometry(scene_, ray_hit.hit.geomID);
@@ -188,7 +191,6 @@ Color4f Raytracer::trace(RTCRay ray, int level) {
 		rtcInterpolate0(geometry, ray_hit.hit.primID, ray_hit.hit.u, ray_hit.hit.v, RTC_BUFFER_TYPE_VERTEX_ATTRIBUTE, 0, &normal.x, 3);
 		Material* material = (Material*)(rtcGetGeometryUserData(geometry));
 		Vector3 normal_vector(normal.x, normal.y, normal.z);
-		Vector3 direction_vector(ray.dir_x, ray.dir_y, ray.dir_z);
 
 		normal_vector.Normalize();
 		direction_vector.Normalize();
@@ -253,8 +255,8 @@ Color4f Raytracer::trace(RTCRay ray, int level) {
 		Vector3 ambient = material->ambient * 0.5;
 		return Color4f{ r+ambient.x, g+ambient.y, b+ambient.z, 1.0f };
 	}
-
-	return BACKGROUND_COLOR;
+	//Color4f background = background_.get_texel(direction_vector);
+	return BACKGROUND_COLOR ;
 }
 
 Color4f Raytracer::get_pixel( const int x, const int y, const float t )
