@@ -104,6 +104,7 @@ public:
 	float shininess; /*!< Koeficient lesklosti (\f$\ge 0\f$). Èím je hodnota vìtší, tím se jeví povrch lesklejší. */
 
 	float reflectivity; /*!< Koeficient odrazivosti. */
+	Vector3 refractivity; /*!< Koeficienty Utlumu svetla. */
 	float ior; /*!< Index lomu. */
 
 	static const char kDiffuseMapSlot; /*!< Èíslo slotu difuzní textury. */

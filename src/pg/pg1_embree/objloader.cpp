@@ -140,7 +140,10 @@ int LoadMTL( const char * file_name, const char * path, std::vector<Material *> 
 				{
 					sscanf( tmp, "%*s %f", &material->ior);
 				}
-				if ( strstr( tmp, "Kd" ) == tmp ) // diffuse color of the material
+				if ( strstr( tmp, "Tf" ) == tmp ) // attenuation coefficient
+				{
+					sscanf( tmp, "%*s %f %f %f", &material->refractivity.x, &material->refractivity.y, &material->refractivity.z );
+				}if ( strstr( tmp, "Kd" ) == tmp ) // diffuse color of the material
 				{
 					sscanf( tmp, "%*s %f %f %f", &material->diffuse.x, &material->diffuse.y, &material->diffuse.z );
 				}

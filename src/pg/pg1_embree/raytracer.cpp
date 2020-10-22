@@ -59,19 +59,22 @@ void Raytracer::LoadScene(const std::string file_name)
 	const int no_surfaces = LoadOBJ(file_name.c_str(), surfaces_, materials_);
 
 	// add lights
-	Vector3 red(0.8, 0.2, 0.2);
-	Vector3 green(0.2, 0.8, 0.2);
-	Vector3 blue(0.2, 0.2, 0.8);
-	Vector3 white(1, 1, 1);
-	LightSource red_light(Vector3(-10,0,0), red, red, red);
-	LightSource green_light(Vector3(0,80,0), green, green, green);
-	LightSource blue_light(Vector3(0,0,-50), blue, blue, blue);
-	LightSource white_light(Vector3(10, 0, 0), white, white, white);
+
+	//Vector3 red(0.8, 0.2, 0.2);
+	//Vector3 green(0.2, 0.8, 0.2);
+	//Vector3 blue(0.2, 0.2, 0.8);
+	//LightSource red_light(Vector3(-10,0,0), red, red, red);
+	//LightSource green_light(Vector3(0,80,0), green, green, green);
+	//LightSource blue_light(Vector3(0,0,-50), blue, blue, blue);
 
 	//lights_.push_back(red_light);
 	//lights_.push_back(green_light);
 	//lights_.push_back(blue_light);
+	Vector3 white(1, 1, 1);
+	LightSource white_light(Vector3(10, 0, 0), white, white, white);
 	lights_.push_back(white_light);
+
+	this->background_ = SphericalMap("../../../data/spherical_map_haus.jpg");
 
 	// surfaces loop
 	for ( auto surface : surfaces_ )
@@ -156,12 +159,12 @@ bool Raytracer::isIlluminated(LightSource light, Vector3 hit_position)
 	return (light_ray_hit.hit.geomID != RTC_INVALID_GEOMETRY_ID);
 }
 
-RTCRay Raytracer::get_refraction_ray(Vector3 direction, Vector3 normal, float iorFrom, float iorTo, Vector3 hit_point)
+RTCRay Raytracer::get_refraction_ray(Vector3 direction, Vector3 normal, float n1, float n2, Vector3 hit_point)
 {
 	RTCRay refraction_ray;
 	direction.Normalize();
 	normal.Normalize();
-	float n1_n2 = iorFrom / iorTo;
+	float n1_n2 = n1 / n2;
 	Vector3 refraction_direction = (n1_n2 * direction) - (n1_n2 * (direction.DotProduct(normal)) + sqrt(1 - pow(n1_n2, 2) * (1 - pow(direction.DotProduct(normal), 2)))) * normal;
 
 	refraction_ray.org_x = hit_point.x;
@@ -174,7 +177,7 @@ RTCRay Raytracer::get_refraction_ray(Vector3 direction, Vector3 normal, float io
 
 	refraction_ray.tnear = FLT_MIN;
 	refraction_ray.tfar = FLT_MAX;
-	refraction_ray.time = 0.0f;
+	refraction_ray.time = n2;
 
 	refraction_ray.mask = 0; // can be used to mask out some geometries for some rays
 	refraction_ray.id = 0; // identify a ray inside a callback function
@@ -183,7 +186,7 @@ RTCRay Raytracer::get_refraction_ray(Vector3 direction, Vector3 normal, float io
 	return refraction_ray;
 }
 
-RTCRay Raytracer::get_reflection_ray(Vector3 direction, Vector3 normal, Vector3 hit_point)
+RTCRay Raytracer::get_reflection_ray(Vector3 direction, Vector3 normal, Vector3 hit_point, float ior)
 {
 	RTCRay reflection_ray;
 	direction.Normalize();
@@ -201,7 +204,7 @@ RTCRay Raytracer::get_reflection_ray(Vector3 direction, Vector3 normal, Vector3 
 
 	reflection_ray.tnear = FLT_MIN;
 	reflection_ray.tfar = FLT_MAX;
-	reflection_ray.time = 0.0f;
+	reflection_ray.time = ior;
 
 	reflection_ray.mask = 0; // can be used to mask out some geometries for some rays
 	reflection_ray.id = 0; // identify a ray inside a callback function
@@ -210,13 +213,7 @@ RTCRay Raytracer::get_reflection_ray(Vector3 direction, Vector3 normal, Vector3 
 	return reflection_ray;
 }
 
-Color4f Raytracer::trace(RTCRay ray, int level, float ior ) {
-	// omezeni zanoreni
-	if(level>=6){
-		// TODO!
-		return Color4f{0.1,0.1,0.1,1};
-	}
-
+Color4f Raytracer::trace(RTCRay ray, int level ) {
 	RTCHit hit;
 	hit.geomID = RTC_INVALID_GEOMETRY_ID;
 	hit.primID = RTC_INVALID_GEOMETRY_ID;
@@ -235,6 +232,12 @@ Color4f Raytracer::trace(RTCRay ray, int level, float ior ) {
 	rtcIntersect1(scene_, &context, &ray_hit);
 
 	Vector3 direction_vector(ray.dir_x, ray.dir_y, ray.dir_z);
+	Color4f background_pixel = this->background_.get_texel(direction_vector.x, direction_vector.y, direction_vector.z);
+
+	if (level >= 6) {
+		return background_pixel;
+		//return Color4f{ 1,0,0,1 };
+	}
 
 	if (ray_hit.hit.geomID != RTC_INVALID_GEOMETRY_ID) // we hit something
 	{
@@ -255,18 +258,25 @@ Color4f Raytracer::trace(RTCRay ray, int level, float ior ) {
 		RTCRay reflection_ray;
 		RTCRay refraction_ray;
 		Color4f final_color;
-		//Vector3 refraction_direction = getRefractedVector(direction_vector, normal_vector, ior, material->ior);
-		reflection_ray = get_reflection_ray(direction_vector, normal_vector, hit_point);
-		refraction_ray = get_refraction_ray(direction_vector, normal_vector, ior, material->ior, hit_point);
 
 		float local_r, local_g, local_b;
-		int local_ior;
+		int n1, n2;
 		switch (material->type) {
 		case 4: //sklo
-			local_ior = (material->ior == ior) ? 1 : material->ior;
-			 
-			Color4f refraction_color = trace(refraction_ray, level+1, local_ior);
-			Color4f reflection_color = trace(reflection_ray, level+1, 1);
+			if (ray.time == IOR_AIR) {
+				n1 = IOR_AIR;
+				n2 = material->ior;
+			}
+			else {
+				n1 = material->ior;
+				n2 = IOR_AIR;
+			}
+
+			reflection_ray = get_reflection_ray(direction_vector, normal_vector, hit_point, n1);
+			refraction_ray = get_refraction_ray(direction_vector, normal_vector, n1, n2, hit_point);
+
+			Color4f refraction_color = trace(refraction_ray, level+1);
+			Color4f reflection_color = trace(reflection_ray, level+1);
 
 			RTCHit refraction_end;
 			refraction_end.geomID = RTC_INVALID_GEOMETRY_ID;
@@ -357,15 +367,16 @@ Color4f Raytracer::trace(RTCRay ray, int level, float ior ) {
 		}
 
 	}
-	//Color4f background = background_.get_texel(direction_vector);
-	return BACKGROUND_COLOR ;
+
+	return background_pixel;
 }
 
 Color4f Raytracer::get_pixel( const int x, const int y, const float t )
 {
 	// generate primary ray and perform ray cast on the scene
 	RTCRay primary_ray = camera_.GenerateRay(x, y);
-	return trace(primary_ray, 1, 1);
+	primary_ray.time = IOR_AIR;
+	return trace(primary_ray, 1);
 }
 
 int Raytracer::Ui()

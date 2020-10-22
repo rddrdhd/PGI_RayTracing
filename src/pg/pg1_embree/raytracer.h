@@ -4,6 +4,7 @@
 #include "camera.h"
 #include "LightSource.h"
 #include "CubeMap.h"
+#include "SphericalMap.h"
 
 /*! \class Raytracer
 \brief General ray tracer class.
@@ -26,7 +27,7 @@ public:
 
 	void LoadScene( const std::string file_name );
 
-	Color4f trace( RTCRay ray, int level, float ior );
+	Color4f trace( RTCRay ray, int level );
 	Color4f get_pixel( const int x, const int y, const float t = 0.0f ) override;
 	bool isIlluminated(LightSource light, Vector3 hit_position);
 
@@ -34,7 +35,7 @@ public:
 
 
 	RTCRay get_refraction_ray(Vector3 direction, Vector3 normal, float iorFrom, float iorTo, Vector3 hit_point);
-	RTCRay get_reflection_ray(Vector3 direction, Vector3 normal, Vector3 hit_point);
+	RTCRay get_reflection_ray(Vector3 direction, Vector3 normal, Vector3 hit_point, float ior);
 
 
 private:
@@ -43,6 +44,7 @@ private:
 	std::vector<LightSource> lights_;
 
 	//CubeMap background_;
+	SphericalMap background_;
 	RTCDevice device_;
 	RTCScene scene_;
 	Camera camera_;
