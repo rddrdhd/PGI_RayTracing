@@ -192,6 +192,7 @@ RTCRay Raytracer::get_reflection_ray(Vector3 direction, Vector3 normal, Vector3 
 	direction.Normalize();
 	normal.Normalize();
 
+	//Vector3 reflection_direction = direction - 2 * (direction.DotProduct(normal) * normal);
 	Vector3 reflection_direction = direction - 2 * (direction.DotProduct(normal) * normal);
 	
 	reflection_ray.org_x = hit_point.x;
@@ -234,9 +235,10 @@ Color4f Raytracer::trace(RTCRay ray, int level ) {
 	Vector3 direction_vector(ray.dir_x, ray.dir_y, ray.dir_z);
 	Color4f background_pixel = this->background_.get_texel(direction_vector.x, direction_vector.y, direction_vector.z);
 
-	if (level >= 6) {
-		return background_pixel;
-		//return Color4f{ 1,0,0,1 };
+	
+	if (level >= 7) {
+		//return background_pixel;
+		return Color4f{ 1,0,0,1 };
 	}
 
 	if (ray_hit.hit.geomID != RTC_INVALID_GEOMETRY_ID) // we hit something
@@ -256,8 +258,8 @@ Color4f Raytracer::trace(RTCRay ray, int level ) {
 
 
 		RTCRay reflection_ray;
-		RTCRay refraction_ray;
-		Color4f final_color;
+		//RTCRay refraction_ray;
+		Color4f final_color{material->diffuse.x, material->diffuse.y, material->diffuse.z, 1};
 
 		float local_r, local_g, local_b;
 		int n1, n2;
@@ -273,11 +275,27 @@ Color4f Raytracer::trace(RTCRay ray, int level ) {
 			}
 
 			reflection_ray = get_reflection_ray(direction_vector, normal_vector, hit_point, n1);
-			refraction_ray = get_refraction_ray(direction_vector, normal_vector, n1, n2, hit_point);
+			//refraction_ray = get_refraction_ray(direction_vector, normal_vector, n1, n2, hit_point);
 
-			Color4f refraction_color = trace(refraction_ray, level+1);
+			//Color4f refraction_color = trace(refraction_ray, level+1);
 			Color4f reflection_color = trace(reflection_ray, level+1);
+			final_color.r = 0.8 * reflection_color.r;
+			final_color.g= 0.8 * reflection_color.g;
+			final_color.b = 0.8 * reflection_color.b;
+/*
+			RTCHit reflection_hit;
+			reflection_hit.geomID = RTC_INVALID_GEOMETRY_ID;
+			reflection_hit.primID = RTC_INVALID_GEOMETRY_ID;
+			reflection_hit.Ng_x = 0.0f; // geometry normal
+			reflection_hit.Ng_y = 0.0f;
+			reflection_hit.Ng_z = 0.0f;
 
+			RTCRayHit reflection_ray_hit;
+			reflection_ray_hit.ray = reflection_ray;
+			reflection_ray_hit.hit = reflection_hit;
+			*/
+
+/*
 			RTCHit refraction_end;
 			refraction_end.geomID = RTC_INVALID_GEOMETRY_ID;
 			refraction_end.primID = RTC_INVALID_GEOMETRY_ID;
@@ -299,10 +317,10 @@ Color4f Raytracer::trace(RTCRay ray, int level ) {
 
 			final_color = {
 				(reflection_color.b * 0.046f + refraction_color.b * 0.954f) * local_b,
-				(reflection_color.g * 0.046f + refraction_color.g * 0.954f)*local_g,
+				(reflection_color.g * 0.046f + refraction_color.g * 0.954f)* local_g,
 				(reflection_color.r * 0.046f + refraction_color.r * 0.954f)* local_r,
 				1.0f
-			};
+			};*/
 			return final_color;
 			break;
 		default:		
