@@ -74,7 +74,7 @@ void Raytracer::LoadScene(const std::string file_name)
 	LightSource white_light(Vector3(10, 0, 0), white, white, white);
 	lights_.push_back(white_light);
 
-	this->background_ = SphericalMap("../../../data/spherical_map_haus.jpg");
+	this->background_ = SphericalMap();//"../../../data/spherical_map_haus.jpg");
 
 	// surfaces loop
 	for ( auto surface : surfaces_ )
@@ -136,7 +136,7 @@ void Raytracer::LoadScene(const std::string file_name)
 	rtcCommitScene( scene_ );
 }
 
-bool Raytracer::isIlluminated(LightSource light, Vector3 hit_position)
+bool Raytracer::isIlluminated(LightSource light, Vector3 hit_position, Vector3 normal)
 {
 	RTCHit light_hit;
 	light_hit.geomID = RTC_INVALID_GEOMETRY_ID;
@@ -154,9 +154,13 @@ bool Raytracer::isIlluminated(LightSource light, Vector3 hit_position)
 	// intersect ray with the scene
 	RTCIntersectContext context;
 	rtcInitIntersectContext(&context);
-	rtcIntersect1(scene_, &context, &light_ray_hit);
+	rtcIntersect1(scene_, &context, &light_ray_hit); 
+	//RTCGeometry geometry = rtcGetGeometry(scene_, light_ray_hit.hit.geomID);
+	
+	//Material* material = (Material*)(rtcGetGeometryUserData(geometry));
 
-	return (light_ray_hit.hit.geomID != RTC_INVALID_GEOMETRY_ID);
+
+	return (light_ray_hit.hit.geomID != RTC_INVALID_GEOMETRY_ID);// ||  material->type==4);//||
 }
 
 RTCRay Raytracer::get_refraction_ray(Vector3 direction, Vector3 normal, float n1, float n2, Vector3 hit_point)
@@ -175,7 +179,7 @@ RTCRay Raytracer::get_refraction_ray(Vector3 direction, Vector3 normal, float n1
 	refraction_ray.dir_y = refraction_direction.y;
 	refraction_ray.dir_z = refraction_direction.z;
 
-	refraction_ray.tnear = FLT_MIN;
+	refraction_ray.tnear = 0.1;
 	refraction_ray.tfar = FLT_MAX;
 	refraction_ray.time = n2;
 
@@ -203,7 +207,7 @@ RTCRay Raytracer::get_reflection_ray(Vector3 direction, Vector3 normal, Vector3 
 	reflection_ray.dir_y = reflection_direction.y;
 	reflection_ray.dir_z = reflection_direction.z;
 
-	reflection_ray.tnear = FLT_MIN;
+	reflection_ray.tnear = 0.1;
 	reflection_ray.tfar = FLT_MAX;
 	reflection_ray.time = ior;
 
@@ -258,7 +262,6 @@ Color4f Raytracer::trace(RTCRay ray, int level ) {
 
 
 		RTCRay reflection_ray;
-		//RTCRay refraction_ray;
 		Color4f final_color{material->diffuse.x, material->diffuse.y, material->diffuse.z, 1};
 
 		float local_r, local_g, local_b;
@@ -274,28 +277,22 @@ Color4f Raytracer::trace(RTCRay ray, int level ) {
 				n2 = IOR_AIR;
 			}
 
+			// reflection
 			reflection_ray = get_reflection_ray(direction_vector, normal_vector, hit_point, n1);
-			//refraction_ray = get_refraction_ray(direction_vector, normal_vector, n1, n2, hit_point);
-
-			//Color4f refraction_color = trace(refraction_ray, level+1);
+	
 			Color4f reflection_color = trace(reflection_ray, level+1);
 			final_color.r = 0.8 * reflection_color.r;
 			final_color.g= 0.8 * reflection_color.g;
 			final_color.b = 0.8 * reflection_color.b;
-/*
-			RTCHit reflection_hit;
-			reflection_hit.geomID = RTC_INVALID_GEOMETRY_ID;
-			reflection_hit.primID = RTC_INVALID_GEOMETRY_ID;
-			reflection_hit.Ng_x = 0.0f; // geometry normal
-			reflection_hit.Ng_y = 0.0f;
-			reflection_hit.Ng_z = 0.0f;
 
-			RTCRayHit reflection_ray_hit;
-			reflection_ray_hit.ray = reflection_ray;
-			reflection_ray_hit.hit = reflection_hit;
-			*/
+			//refraction
+			/*
+			RTCRay refraction_ray;
+			refraction_ray = get_refraction_ray(direction_vector, normal_vector, n1, n2, hit_point);
 
-/*
+			Color4f refraction_color = trace(refraction_ray, level+1);
+
+
 			RTCHit refraction_end;
 			refraction_end.geomID = RTC_INVALID_GEOMETRY_ID;
 			refraction_end.primID = RTC_INVALID_GEOMETRY_ID;
@@ -345,9 +342,7 @@ Color4f Raytracer::trace(RTCRay ray, int level ) {
 
 			for (LightSource light : this->lights_) {
 
-				if (isIlluminated(light, Vector3(hit_point.x, hit_point.y, hit_point.z))) {
-					// TODO!
-					//if (material->diffuse.z < 0.01) trace(ray, 2);
+				if (isIlluminated(light, Vector3(hit_point.x, hit_point.y, hit_point.z), Vector3(normal.x, normal.y, normal.z))) {
 
 					//vypocitam vektor z hitu do svetla
 					Vector3 l(hit_point.x - light.position_.x, hit_point.y - light.position_.y, hit_point.z - light.position_.z);
