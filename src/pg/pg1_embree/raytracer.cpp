@@ -167,21 +167,25 @@ bool Raytracer::isIlluminated(LightSource light, Vector3 hit_position, Vector3 n
 
 RTCRay Raytracer::get_refraction_ray(Vector3 direction, Vector3 normal, float n1, float n2, Vector3 hit_point)
 {
+
 	RTCRay refraction_ray;
 	direction.Normalize();
 	normal.Normalize();
-	float n1_n2 = n1 / n2;
-	Vector3 refraction_direction = (n1_n2 * direction) - (n1_n2 * (direction.DotProduct(normal)) + sqrt(1 - pow(n1_n2, 2) * (1 - pow(direction.DotProduct(normal), 2)))) * normal;
-
+	//if (n2 < FLT_MIN)n2 = 0.0001;
+	float n1_n2 = (float) (n1 / n2);
+	float d_n_ = (float) (direction.DotProduct(normal));
+	Vector3 scaled_direction = Vector3(direction.x * n1_n2, direction.y * n1_n2, direction.z * n1_n2);
+	Vector3 refraction_direction = ( (scaled_direction)  - (n1_n2 * d_n_ + sqrt( 1 - ( (n1_n2*n1_n2)  * (1 -( d_n_* d_n_))) ) ) * normal);
+	
 	refraction_ray.org_x = hit_point.x;
 	refraction_ray.org_y = hit_point.y;
 	refraction_ray.org_z = hit_point.z;
 
-	refraction_ray.dir_x = refraction_direction.x;
-	refraction_ray.dir_y = refraction_direction.y;
-	refraction_ray.dir_z = refraction_direction.z;
+	refraction_ray.dir_x = (refraction_direction.x);
+	refraction_ray.dir_y = (refraction_direction.y);
+	refraction_ray.dir_z = (refraction_direction.z);
 
-	refraction_ray.tnear = 0.1;
+	refraction_ray.tnear = 0.01f;
 	refraction_ray.tfar = FLT_MAX;
 	refraction_ray.time = n2;
 
@@ -208,7 +212,7 @@ RTCRay Raytracer::get_reflection_ray(Vector3 direction, Vector3 normal, Vector3 
 	reflection_ray.dir_y = reflection_direction.y;
 	reflection_ray.dir_z = reflection_direction.z;
 
-	reflection_ray.tnear = 0.1;
+	reflection_ray.tnear = 0.01;
 	reflection_ray.tfar = FLT_MAX;
 	reflection_ray.time = ior;
 
@@ -236,14 +240,22 @@ Color4f Raytracer::trace(RTCRay ray, int level ) {
 	RTCIntersectContext context;
 	rtcInitIntersectContext(&context);
 	rtcIntersect1(scene_, &context, &ray_hit);
+	// tady pocitam direction_vector, ale davam tam puvodni direction toho hitu?
+	Vector3 primary_ray_direction_vector(ray_hit.ray.dir_x, ray_hit.ray.dir_y, ray_hit.ray.dir_z);
+	Color4f background_pixel = this->background_.get_texel(
+		primary_ray_direction_vector.x, 
+		primary_ray_direction_vector.y, 
+		primary_ray_direction_vector.z);
 
-	Vector3 direction_vector(ray_hit.ray.dir_x, ray_hit.ray.dir_y, ray_hit.ray.dir_z);
-	Color4f background_pixel = this->background_.get_texel(direction_vector.x, direction_vector.y, direction_vector.z);
+	{
+		//dukaz, ze smer refraxe mam dobre
+		//RTCRay test = get_refraction_ray(Vector3(-0.429,-0.903,0), Vector3(0,1,0),1.5, 1, Vector3(0,0,0));
+		//test.id = 0;
+	}
 
-	
-	if (level >= 7) {
-		//return background_pixel;
-		return Color4f{ 1,0,0,1 };
+	if (level >=10) {
+		return background_pixel;
+		//return Color4f{ 1,0,0,1 };
 	}
 
 	if (ray_hit.hit.geomID != RTC_INVALID_GEOMETRY_ID) // we hit something
@@ -260,17 +272,22 @@ Color4f Raytracer::trace(RTCRay ray, int level ) {
 		Vector3 hit_point = Vector3(ray_hit.ray.org_x, ray_hit.ray.org_y, ray_hit.ray.org_z) +
 			Vector3(ray_hit.ray.dir_x, ray_hit.ray.dir_y, ray_hit.ray.dir_z) * ray_hit.ray.tfar;
 
-		RTCRay reflection_ray;
+		//RTCRay reflection_ray;
 		Color4f final_color{material->diffuse.x, material->diffuse.y, material->diffuse.z, 1};
 
 		float local_r, local_g, local_b;
 		float n1, n2;
-		//float vzduch_index_lomu = 1.000293f;
+		if (normal_vector.DotProduct(primary_ray_direction_vector) > 0) {
+			// fix orientace normal
+			normal_vector = -normal_vector;
+		}
 
-		//float n1 = (ray.time == vzduch_index_lomu) ? vzduch_index_lomu : material->ior;
-		//float n2 = (ray.time == vzduch_index_lomu) ? material->ior : vzduch_index_lomu;
+		normal_vector.Normalize();
+		primary_ray_direction_vector.Normalize();
+		//float n1 = (ray.time == IOR_AIR) ? IOR_AIR : material->ior;
+		//float n2 = (ray.time == IOR_AIR) ? material->ior : IOR_AIR;
 		switch (material->type) {
-		case 4: //sklo
+		case 4: //pruhledny material
 			if (ray.time == IOR_AIR) {
 				n1 = IOR_AIR;
 				n2 = material->ior;
@@ -279,8 +296,6 @@ Color4f Raytracer::trace(RTCRay ray, int level ) {
 				n1 = material->ior;
 				n2 = IOR_AIR;
 			}
-
-
 			// reflection
 			/*reflection_ray = get_reflection_ray(direction_vector, normal_vector, hit_point, n1);
 	
@@ -292,10 +307,10 @@ Color4f Raytracer::trace(RTCRay ray, int level ) {
 			//refraction
 			
 			RTCRay refraction_ray;
-			refraction_ray = get_refraction_ray(direction_vector, normal_vector, n1, n2, hit_point);
+			refraction_ray = get_refraction_ray(primary_ray_direction_vector, normal_vector, n1, n2, hit_point);
 
-			//Color4f refraction_color = trace(refraction_ray, level+1);
-			Color4f refraction_color = this->background_.get_texel(refraction_ray.dir_x, refraction_ray.dir_y, refraction_ray.dir_z);
+			Color4f refraction_color = trace(refraction_ray, level+1);
+			//Color4f refraction_color = this->background_.get_texel(refraction_ray.dir_x, refraction_ray.dir_y, refraction_ray.dir_z);
 
 			
 			/*
@@ -340,13 +355,8 @@ Color4f Raytracer::trace(RTCRay ray, int level ) {
 			return final_color;
 			break;
 		default:		
-			normal_vector.Normalize();
-			direction_vector.Normalize();
 
-			if (normal_vector.DotProduct(direction_vector) > 0) {
-				// fix orientace normal
-				normal_vector = -normal_vector;
-			}
+			
 
 			/*
 			// abchom mohli promitnout normaly jako barvy
@@ -408,7 +418,7 @@ Color4f Raytracer::get_pixel( const int x, const int y, const float t )
 	// generate primary ray and perform ray cast on the scene
 	RTCRay primary_ray = camera_.GenerateRay(x, y);
 	primary_ray.time = IOR_AIR;
-	return trace(primary_ray, 1);
+	return trace(primary_ray, 0);
 }
 
 int Raytracer::Ui()
