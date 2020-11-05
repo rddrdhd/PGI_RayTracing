@@ -166,13 +166,15 @@
     <ClInclude Include="..\..\libs\imgui\stb_rect_pack.h" />
     <ClInclude Include="..\..\libs\imgui\stb_textedit.h" />
     <ClInclude Include="..\..\libs\imgui\stb_truetype.h" />
-    <ClInclude Include="camera.h" />
+    <ClInclude Include="PinHoleCamera.h" />
+    <ClInclude Include="LightSource.h" />
     <ClInclude Include="material.h" />
     <ClInclude Include="matrix3x3.h" />
     <ClInclude Include="mymath.h" />
     <ClInclude Include="objloader.h" />
     <ClInclude Include="raytracer.h" />
     <ClInclude Include="simpleguidx11.h" />
+    <ClInclude Include="SphericalMap.h" />
     <ClInclude Include="stdafx.h" />
     <ClInclude Include="structs.h" />
     <ClInclude Include="surface.h" />
@@ -190,7 +192,8 @@
     <ClCompile Include="..\..\libs\imgui\imgui_draw.cpp" />
     <ClCompile Include="..\..\libs\imgui\imgui_impl_dx11.cpp" />
     <ClCompile Include="..\..\libs\imgui\imgui_impl_win32.cpp" />
-    <ClCompile Include="camera.cpp" />
+    <ClCompile Include="PinHoleCamera.cpp" />
+    <ClCompile Include="LightSource.cpp" />
     <ClCompile Include="material.cpp" />
     <ClCompile Include="matrix3x3.cpp" />
     <ClCompile Include="mymath.cpp" />
@@ -198,6 +201,7 @@
     <ClCompile Include="raytracer.cpp" />
     <ClCompile Include="pg1_embree.cpp" />
     <ClCompile Include="simpleguidx11.cpp" />
+    <ClCompile Include="SphericalMap.cpp" />
     <ClCompile Include="stdafx.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>

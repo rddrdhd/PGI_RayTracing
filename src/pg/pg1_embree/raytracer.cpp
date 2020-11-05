@@ -6,24 +6,13 @@
 #include <iostream>
 using namespace std;
 
-#define BACKGROUND_COLOR Color4f{ 0.1f, 0.1f, 0.1f, 1.0f }
-//#define IOR_AIR 1.000293f
-
 Raytracer::Raytracer( const int width, const int height,
 	const float fov_y, const Vector3 view_from, const Vector3 view_at,
 	const char * config ) : SimpleGuiDX11( width, height )
 {
 	InitDeviceAndScene( config );
 
-	camera_ = Camera( width, height, fov_y, view_from, view_at );
-	/*
-	background_ = CubeMap(
-		"../../../data/PalmTrees/posz.jpg",
-		"../../../data/PalmTrees/negx.jpg",
-		"../../../data/PalmTrees/posx.jpg",
-		"../../../data/PalmTrees/negz.jpg",
-		"../../../data/PalmTrees/posy.jpg",
-		"../../../data/PalmTrees/negy.jpg");*/
+	camera_ = PinHoleCamera( width, height, fov_y, view_from, view_at );
 }
 
 Raytracer::~Raytracer()
@@ -54,29 +43,28 @@ int Raytracer::ReleaseDeviceAndScene()
 }
 
 
-void Raytracer::LoadScene(const std::string file_name)
+void Raytracer::LoadScene(const std::string object_file_name, const std::string background_file_name)
 {
-	//std::string path = "../../../data/PalmTrees/";
+	const int no_surfaces = LoadOBJ(object_file_name.c_str(), surfaces_, materials_);
 
-	const int no_surfaces = LoadOBJ(file_name.c_str(), surfaces_, materials_);
+	// SET svetla
+	/*
+	Vector3 red(0.8, 0.2, 0.2);
+	Vector3 green(0.2, 0.8, 0.2);
+	Vector3 blue(0.2, 0.2, 0.8);
+	LightSource red_light(Vector3(-10,0,0), red, red, red);
+	LightSource green_light(Vector3(0,80,0), green, green, green);
+	LightSource blue_light(Vector3(0,0,-50), blue, blue, blue);
 
-	// add lights
-
-	//Vector3 red(0.8, 0.2, 0.2);
-	//Vector3 green(0.2, 0.8, 0.2);
-	//Vector3 blue(0.2, 0.2, 0.8);
-	//LightSource red_light(Vector3(-10,0,0), red, red, red);
-	//LightSource green_light(Vector3(0,80,0), green, green, green);
-	//LightSource blue_light(Vector3(0,0,-50), blue, blue, blue);
-
-	//lights_.push_back(red_light);
-	//lights_.push_back(green_light);
-	//lights_.push_back(blue_light);
+	lights_.push_back(red_light);
+	lights_.push_back(green_light);
+	lights_.push_back(blue_light);
+	*/
 	Vector3 white(1, 1, 1);
 	LightSource white_light(Vector3(10, 0, 0), white, white, white);
 	lights_.push_back(white_light);
 
-	this->background_ = SphericalMap();//"../../../data/spherical_map_haus.jpg");
+	this->background_ = SphericalMap(background_file_name);
 
 	// surfaces loop
 	for ( auto surface : surfaces_ )
@@ -167,11 +155,10 @@ bool Raytracer::isIlluminated(LightSource light, Vector3 hit_position, Vector3 n
 
 RTCRay Raytracer::get_refraction_ray(Vector3 direction, Vector3 normal, float n1, float n2, Vector3 hit_point)
 {
-
 	RTCRay refraction_ray;
 	direction.Normalize();
 	normal.Normalize();
-	//if (n2 < FLT_MIN)n2 = 0.0001;
+
 	float n1_n2 = (float) (n1 / n2);
 	float d_n_ = (float) (direction.DotProduct(normal));
 	Vector3 scaled_direction = Vector3(direction.x * n1_n2, direction.y * n1_n2, direction.z * n1_n2);
@@ -212,8 +199,8 @@ RTCRay Raytracer::get_reflection_ray(Vector3 direction, Vector3 normal, Vector3 
 	reflection_ray.dir_y = reflection_direction.y;
 	reflection_ray.dir_z = reflection_direction.z;
 
-	reflection_ray.tnear = 0.01;
-	reflection_ray.tfar = FLT_MAX;
+	reflection_ray.tnear = 0.01f;
+	reflection_ray.tfar = (float)FLT_MAX;
 	reflection_ray.time = ior;
 
 	reflection_ray.mask = 0; // can be used to mask out some geometries for some rays
@@ -240,22 +227,21 @@ Color4f Raytracer::trace(RTCRay ray, int level ) {
 	RTCIntersectContext context;
 	rtcInitIntersectContext(&context);
 	rtcIntersect1(scene_, &context, &ray_hit);
-	// tady pocitam direction_vector, ale davam tam puvodni direction toho hitu?
-	Vector3 primary_ray_direction_vector(ray_hit.ray.dir_x, ray_hit.ray.dir_y, ray_hit.ray.dir_z);
-	Color4f background_pixel = this->background_.get_texel(
-		primary_ray_direction_vector.x, 
-		primary_ray_direction_vector.y, 
-		primary_ray_direction_vector.z);
 
-	{
+	// smer paprsku, ktery prave zpracovavam
+	Vector3 primary_ray_direction_vector(ray_hit.ray.dir_x, ray_hit.ray.dir_y, ray_hit.ray.dir_z);
+
+	/*
 		//dukaz, ze smer refraxe mam dobre
 		//RTCRay test = get_refraction_ray(Vector3(-0.429,-0.903,0), Vector3(0,1,0),1.5, 1, Vector3(0,0,0));
 		//test.id = 0;
-	}
+	*/
 
 	if (level >=10) {
-		return background_pixel;
-		//return Color4f{ 1,0,0,1 };
+		return this->background_.get_texel(
+			primary_ray_direction_vector.x,
+			primary_ray_direction_vector.y,
+			primary_ray_direction_vector.z);;
 	}
 
 	if (ray_hit.hit.geomID != RTC_INVALID_GEOMETRY_ID) // we hit something
@@ -272,38 +258,58 @@ Color4f Raytracer::trace(RTCRay ray, int level ) {
 		Vector3 hit_point = Vector3(ray_hit.ray.org_x, ray_hit.ray.org_y, ray_hit.ray.org_z) +
 			Vector3(ray_hit.ray.dir_x, ray_hit.ray.dir_y, ray_hit.ray.dir_z) * ray_hit.ray.tfar;
 
-		//RTCRay reflection_ray;
-		Color4f final_color{material->diffuse.x, material->diffuse.y, material->diffuse.z, 1};
+		RTCRay reflection_ray;
+		Color4f final_color;// {material->diffuse.x, material->diffuse.y, material->diffuse.z, 1};
 
 		float local_r, local_g, local_b;
 		float n1, n2;
-		if (normal_vector.DotProduct(primary_ray_direction_vector) > 0) {
-			// fix orientace normal
-			normal_vector = -normal_vector;
+		if (ray.time == IOR_AIR) {
+			n1 = IOR_AIR;
+			n2 = material->ior;
+		}
+		else {
+			n1 = material->ior;
+			n2 = IOR_AIR;
 		}
 
 		normal_vector.Normalize();
 		primary_ray_direction_vector.Normalize();
-		//float n1 = (ray.time == IOR_AIR) ? IOR_AIR : material->ior;
-		//float n2 = (ray.time == IOR_AIR) ? material->ior : IOR_AIR;
+
+		if (normal_vector.DotProduct(primary_ray_direction_vector) > 0) {
+			// fix orientace normal
+			normal_vector = -normal_vector;
+		}
+		//n1 = 1.5;
+		//n2 = 1;
+		//primary_ray_direction_vector = Vector3(-0.429, -0.903, 0);
+		//normal_vector = Vector3(0, 1, 0);
+
+		//TODO
+		float R = 0.046f;
+		Vector3 v = -primary_ray_direction_vector;
+
+		float cos1, cos2, Rs, Rp;
+		cos1 = abs(normal_vector.DotProduct(v)); ;
+		float n1_n2_twice = ((n1 / n2) * (n1 / n2));
+		float one_minus_cos1_twice = 1 - (cos1 * cos1);
+		cos2 = sqrt(1 - (n1_n2_twice * one_minus_cos1_twice));
+
+		float uhel_2 =(float) (acos(cos2) * (180.0 / 3.141592653589793238463)) ;
+		Rs = (n2 * cos2 - n1 * cos1) / (n2 * cos2 + n2 * cos1)* (n2 * cos2 - n1 * cos1) / (n2 * cos2 + n2 * cos1);
+		Rp = (n2 * cos1 - n1 * cos2) / (n2 * cos1 + n2 * cos2)* (n2 * cos1 - n1 * cos2) / (n2 * cos1 + n2 * cos2);
+		R = (Rs + Rp) / 2;
+		if (!(R > 0 && R < 1))R = 0.046f; // TODO!!!!
 		switch (material->type) {
 		case 4: //pruhledny material
-			if (ray.time == IOR_AIR) {
-				n1 = IOR_AIR;
-				n2 = material->ior;
-			}
-			else {
-				n1 = material->ior;
-				n2 = IOR_AIR;
-			}
+		
 			// reflection
-			/*reflection_ray = get_reflection_ray(direction_vector, normal_vector, hit_point, n1);
+			reflection_ray = get_reflection_ray(primary_ray_direction_vector, normal_vector, hit_point, n1);
 	
 			Color4f reflection_color = trace(reflection_ray, level+1);
-			final_color.r = 0.8 * reflection_color.r;
-			final_color.g= 0.8 * reflection_color.g;
-			final_color.b = 0.8 * reflection_color.b;
-			*/
+			final_color.r = (float) (0.8 * reflection_color.r);
+			final_color.g = (float)(0.8 * reflection_color.g);
+			final_color.b = (float)(0.8 * reflection_color.b);
+			
 			//refraction
 			
 			RTCRay refraction_ray;
@@ -312,8 +318,8 @@ Color4f Raytracer::trace(RTCRay ray, int level ) {
 			Color4f refraction_color = trace(refraction_ray, level+1);
 			//Color4f refraction_color = this->background_.get_texel(refraction_ray.dir_x, refraction_ray.dir_y, refraction_ray.dir_z);
 
+		
 			
-			/*
 			RTCHit refraction_end;
 			refraction_end.geomID = RTC_INVALID_GEOMETRY_ID;
 			refraction_end.primID = RTC_INVALID_GEOMETRY_ID;
@@ -329,27 +335,24 @@ Color4f Raytracer::trace(RTCRay ray, int level ) {
 			rtcInitIntersectContext(&context);
 			rtcIntersect1(scene_, &context, &refraction_ray_hit);
 			
-			local_r = exp(-(1 - material->diffuse.x)*refraction_ray_hit.ray.tfar);
-			local_g = exp(-(1 - material->diffuse.y)*refraction_ray_hit.ray.tfar);
-			local_b = exp(-(1 - material->diffuse.z)*refraction_ray_hit.ray.tfar);
-			*/
-			/*
+
+			local_r = exp(-(1 - material->diffuse.x));
+			local_g = exp(-(1 - material->diffuse.y));
+			local_b = exp(-(1 - material->diffuse.z));
+			if (refraction_ray_hit.hit.geomID != RTC_INVALID_GEOMETRY_ID) // we hit something
+			{
+
+				local_r = exp(-(1 - material->diffuse.x) * refraction_ray_hit.ray.tfar);
+				local_g = exp(-(1 - material->diffuse.y) * refraction_ray_hit.ray.tfar);
+				local_b = exp(-(1 - material->diffuse.z) * refraction_ray_hit.ray.tfar);
+			}
+			
+
+			
 			final_color = {
-				(reflection_color.b * 0.046f + refraction_color.b * 0.954f) * local_b,
-				(reflection_color.g * 0.046f + refraction_color.g * 0.954f)* local_g,
-				(reflection_color.r * 0.046f + refraction_color.r * 0.954f)* local_r,
-				1.0f
-			};
-			final_color = {
-				refraction_color.b * 0.954f * local_b,
-				refraction_color.g * 0.954f * local_g,
-				refraction_color.r * 0.954f * local_r,
-				1.0f
-			};*/
-			final_color = {
-				refraction_color.r,
-				refraction_color.g,
-				refraction_color.b,
+				((reflection_color.b * R) + (refraction_color.b * (1 - R)))*local_r,
+				((reflection_color.g * R) + (refraction_color.g * (1 - R)))* local_g,
+				((reflection_color.r * R) + (refraction_color.r * (1 - R)))* local_b,
 				1.0f
 			};
 			return final_color;
@@ -410,7 +413,10 @@ Color4f Raytracer::trace(RTCRay ray, int level ) {
 
 	}
 
-	return background_pixel;
+	return this->background_.get_texel(
+		primary_ray_direction_vector.x,
+		primary_ray_direction_vector.y,
+		primary_ray_direction_vector.z);;
 }
 
 Color4f Raytracer::get_pixel( const int x, const int y, const float t )

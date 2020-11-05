@@ -1,9 +1,8 @@
 #pragma once
 #include "simpleguidx11.h"
 #include "surface.h"
-#include "camera.h"
+#include "PinHoleCamera.h"
 #include "LightSource.h"
-#include "CubeMap.h"
 #include "SphericalMap.h"
 
 /*! \class Raytracer
@@ -25,7 +24,7 @@ public:
 
 	int ReleaseDeviceAndScene();
 
-	void LoadScene( const std::string file_name );
+	void LoadScene( const std::string object_file_name, const std::string background_file_name);
 
 	Color4f trace( RTCRay ray, int level );
 	Color4f get_pixel( const int x, const int y, const float t = 0.0f ) override;
@@ -43,9 +42,8 @@ private:
 	std::vector<Material *> materials_;
 	std::vector<LightSource> lights_;
 
-	//CubeMap background_;
 	SphericalMap background_;
 	RTCDevice device_;
 	RTCScene scene_;
-	Camera camera_;
+	PinHoleCamera camera_;
 };
