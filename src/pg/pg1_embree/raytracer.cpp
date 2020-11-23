@@ -231,12 +231,11 @@ Color4f Raytracer::trace(RTCRay ray, int level ) {
 	// smer paprsku, ktery prave zpracovavam
 	Vector3 primary_ray_direction_vector(ray_hit.ray.dir_x, ray_hit.ray.dir_y, ray_hit.ray.dir_z);
 
-
 	if (level >=4) { //level>=4 : 3 minuty
 		return this->background_.get_texel(
 			primary_ray_direction_vector.x,
 			primary_ray_direction_vector.y,
-			primary_ray_direction_vector.z);;
+			primary_ray_direction_vector.z);
 	}
 
 	if (ray_hit.hit.geomID != RTC_INVALID_GEOMETRY_ID) // we hit something
@@ -254,15 +253,14 @@ Color4f Raytracer::trace(RTCRay ray, int level ) {
 			Vector3(ray_hit.ray.dir_x, ray_hit.ray.dir_y, ray_hit.ray.dir_z) * ray_hit.ray.tfar;
 
 		RTCRay reflection_ray;
-		Color4f final_color;// {material->diffuse.x, material->diffuse.y, material->diffuse.z, 1};
+		Color4f final_color;
 
 		float local_r, local_g, local_b;
 		float n1, n2;
 		if (ray.time == IOR_AIR) {
 			n1 = IOR_AIR;
 			n2 = material->ior;
-		}
-		else {
+		} else {
 			n1 = material->ior;
 			n2 = IOR_AIR;
 		}
@@ -275,7 +273,7 @@ Color4f Raytracer::trace(RTCRay ray, int level ) {
 			normal_vector = -normal_vector;
 		}
 
-		float R = 0.046f;
+		float R = 0.0f;
 		Vector3 v = -primary_ray_direction_vector;
 
 		float cos1, cos2, Rs, Rp;
@@ -307,9 +305,8 @@ Color4f Raytracer::trace(RTCRay ray, int level ) {
 
 			Color4f refraction_color = trace(refraction_ray, level+1);
 			//Color4f refraction_color = this->background_.get_texel(refraction_ray.dir_x, refraction_ray.dir_y, refraction_ray.dir_z);
-
-		
 			
+			// to know how long is the ray *inside*
 			RTCHit refraction_end;
 			refraction_end.geomID = RTC_INVALID_GEOMETRY_ID;
 			refraction_end.primID = RTC_INVALID_GEOMETRY_ID;
@@ -329,28 +326,23 @@ Color4f Raytracer::trace(RTCRay ray, int level ) {
 			local_r = exp(-(1 - material->diffuse.x));
 			local_g = exp(-(1 - material->diffuse.y));
 			local_b = exp(-(1 - material->diffuse.z));
-			if (refraction_ray_hit.hit.geomID != RTC_INVALID_GEOMETRY_ID) // we hit something
-			{
 
+			// if we are *inside* and hit the end of *inside*
+			if (refraction_ray_hit.hit.geomID != RTC_INVALID_GEOMETRY_ID) { 
 				local_r = exp(-(1 - material->diffuse.x) * refraction_ray_hit.ray.tfar);
 				local_g = exp(-(1 - material->diffuse.y) * refraction_ray_hit.ray.tfar);
 				local_b = exp(-(1 - material->diffuse.z) * refraction_ray_hit.ray.tfar);
 			}
-			
 
-			
 			final_color = {
-				((reflection_color.b * R) + (refraction_color.b * (1 - R)))*local_r,
-				((reflection_color.g * R) + (refraction_color.g * (1 - R)))* local_g,
-				((reflection_color.r * R) + (refraction_color.r * (1 - R)))* local_b,
+				((reflection_color.b * R) + (refraction_color.b * (1 - R))) * local_r,
+				((reflection_color.g * R) + (refraction_color.g * (1 - R))) * local_g,
+				((reflection_color.r * R) + (refraction_color.r * (1 - R))) * local_b,
 				1.0f
 			};
 			return final_color;
 			break;
-		default:		
-
-			
-
+		default:
 			/*
 			// abchom mohli promitnout normaly jako barvy
 			float nx = (((normal_vector.x) + 1) / 2);
@@ -369,13 +361,16 @@ Color4f Raytracer::trace(RTCRay ray, int level ) {
 					//vypocitam vektor z hitu do svetla
 					Vector3 l(hit_point.x - light.position_.x, hit_point.y - light.position_.y, hit_point.z - light.position_.z);
 					l.Normalize();
+
 					// vypocitam vektor z hitu do oka
 					Vector3 v(ray.org_x - ray.dir_x, ray.org_y - ray.dir_y, ray.org_z - ray.dir_z);
 					v.Normalize();
+
 					Vector3 l_r = 2 * (normal_vector.DotProduct(l)) * normal_vector - l;
 					l_r.Normalize();
 					double gamma = material->shininess;
 
+					// vypocitam jednotlive barvy i s utlumem
 					double i_d = light.diffuse_.x;
 					double m_d = material->diffuse.x;
 					double i_s = light.spectular_.x;
@@ -402,7 +397,7 @@ Color4f Raytracer::trace(RTCRay ray, int level ) {
 		}
 
 	}
-
+	// pokud se nic nestalo, vratim pozadi
 	return this->background_.get_texel(
 		primary_ray_direction_vector.x,
 		primary_ray_direction_vector.y,

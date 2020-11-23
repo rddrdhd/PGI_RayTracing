@@ -188,12 +188,8 @@ int raytrace_loop( const std::string object_file_name ,const std::string backgro
 	Raytracer raytracer( 640, 480, deg2rad(90.0), Vector3(2,0,0), Vector3(0.0f, 0.0f,0));// Pro pohled na kouli
 	raytracer.LoadScene( object_file_name, background_file_name );
 
-	time_t givemetime = time(NULL);
-	printf("%s", ctime(&givemetime)); //ctime() returns given time
 	raytracer.MainLoop();
 
-	givemetime = time(NULL);
-	printf("%s", ctime(&givemetime)); //ctime() returns given time
 	return EXIT_SUCCESS;
 }
 
