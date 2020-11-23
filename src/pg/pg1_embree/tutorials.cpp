@@ -181,14 +181,19 @@ int tutorial_2()
 int raytrace_loop( const std::string object_file_name ,const std::string background_file_name, const char * config )
 {
 	//Raytracer raytracer( 640, 480, deg2rad( 45.0 ), Vector3( 175, -140, 130 ), Vector3( 0, 0, 35 ), config );
-	Raytracer raytracer( 640, 480, deg2rad(42.185f), Vector3(-140.0f, -175.0f, 80.0f), Vector3(0.0f, 0.0f, 40.0f)); // Pro pohled na vesmirnou lod
 	//Raytracer raytracer( 640, 480, deg2rad(42.185f), Vector3(-140.0f, -155.0f, 80.0f), Vector3(0.0f, 0.0f, 40.0f));
+	//Raytracer raytracer(640, 480, deg2rad(42.185f), Vector3(-140.0f, -175.0f, 80.0f), Vector3(0.0f, 0.0f, 40.0f)); // Pro pohled na vesmirnou lod
 
 	// SET view
-	//Raytracer raytracer( 640, 480, deg2rad(90.0), Vector3(2,0,0), Vector3(0.0f, 0.0f,0));// Pro pohled na kouli
+	Raytracer raytracer( 640, 480, deg2rad(90.0), Vector3(2,0,0), Vector3(0.0f, 0.0f,0));// Pro pohled na kouli
 	raytracer.LoadScene( object_file_name, background_file_name );
+
+	time_t givemetime = time(NULL);
+	printf("%s", ctime(&givemetime)); //ctime() returns given time
 	raytracer.MainLoop();
 
+	givemetime = time(NULL);
+	printf("%s", ctime(&givemetime)); //ctime() returns given time
 	return EXIT_SUCCESS;
 }
 

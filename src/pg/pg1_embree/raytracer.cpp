@@ -231,13 +231,8 @@ Color4f Raytracer::trace(RTCRay ray, int level ) {
 	// smer paprsku, ktery prave zpracovavam
 	Vector3 primary_ray_direction_vector(ray_hit.ray.dir_x, ray_hit.ray.dir_y, ray_hit.ray.dir_z);
 
-	/*
-		//dukaz, ze smer refraxe mam dobre
-		//RTCRay test = get_refraction_ray(Vector3(-0.429,-0.903,0), Vector3(0,1,0),1.5, 1, Vector3(0,0,0));
-		//test.id = 0;
-	*/
 
-	if (level >=10) {
+	if (level >=4) { //level>=4 : 3 minuty
 		return this->background_.get_texel(
 			primary_ray_direction_vector.x,
 			primary_ray_direction_vector.y,
@@ -279,28 +274,23 @@ Color4f Raytracer::trace(RTCRay ray, int level ) {
 			// fix orientace normal
 			normal_vector = -normal_vector;
 		}
-		//n1 = 1.5;
-		//n2 = 1;
-		//primary_ray_direction_vector = Vector3(-0.429, -0.903, 0);
-		//normal_vector = Vector3(0, 1, 0);
 
-		//TODO
 		float R = 0.046f;
 		Vector3 v = -primary_ray_direction_vector;
 
 		float cos1, cos2, Rs, Rp;
-		cos1 = abs(normal_vector.DotProduct(v)); ;
+		cos1 = abs(normal_vector.DotProduct(v));
 		float n1_n2_twice = ((n1 / n2) * (n1 / n2));
-		float one_minus_cos1_twice = 1 - (cos1 * cos1);
-		cos2 = sqrt(1 - (n1_n2_twice * one_minus_cos1_twice));
+		float one_minus_cos1_pow2 = (1 - (cos1 * cos1));
+		cos2 = sqrt(1 - (n1_n2_twice * one_minus_cos1_pow2));
 
 		float uhel_2 =(float) (acos(cos2) * (180.0 / 3.141592653589793238463)) ;
-		Rs = (n2 * cos2 - n1 * cos1) / (n2 * cos2 + n2 * cos1)* (n2 * cos2 - n1 * cos1) / (n2 * cos2 + n2 * cos1);
-		Rp = (n2 * cos1 - n1 * cos2) / (n2 * cos1 + n2 * cos2)* (n2 * cos1 - n1 * cos2) / (n2 * cos1 + n2 * cos2);
+		Rs = ((n2 * cos2 - n1 * cos1) / (n2 * cos2 + n1 * cos1)) * ((n2 * cos2 - n1 * cos1) / (n2 * cos2 + n1 * cos1));
+		Rp = ((n2 * cos1 - n1 * cos2) / (n2 * cos1 + n1 * cos2)) * ((n2 * cos1 - n1 * cos2) / (n2 * cos1 + n1 * cos2));
 		R = (Rs + Rp) / 2;
-		if (!(R > 0 && R < 1))R = 0.046f; // TODO!!!!
+		//if (!(R > 0 && R < 1))R = 0.046f; // TODO!!!!
 		switch (material->type) {
-		case 4: //pruhledny material
+		case 4: //pruhledny a leskly material
 		
 			// reflection
 			reflection_ray = get_reflection_ray(primary_ray_direction_vector, normal_vector, hit_point, n1);
