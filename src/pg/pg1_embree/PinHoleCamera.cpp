@@ -36,7 +36,7 @@ RTCRay PinHoleCamera::GenerateRay( const float x_i, const float y_i ) const
 	ray.org_y = view_from_.y;
 	ray.org_z = view_from_.z;
 
-	// smerovy vektor kamery - ray directioon
+	// smerovy vektor kamery
 	Vector3 ray_direction(
 		x_i - (width_ / 2),
 		(height_ / 2) - y_i,

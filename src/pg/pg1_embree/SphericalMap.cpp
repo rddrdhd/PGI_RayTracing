@@ -6,13 +6,11 @@
 SphericalMap::SphericalMap()
 {
 	const std::string file_name = "../../../data/spherical_map_windows.jpg";
-	// 1 load spherical texture from file_name and store it in texture_
 	texture_ = std::make_unique<Texture>(Texture(file_name.c_str()));
 }
 
-SphericalMap::SphericalMap(const std::string& file_name)
+SphericalMap::SphericalMap(const std::string& file_name) 
 {
-	// 1 load spherical texture from file_name and store it in texture_
 	texture_ = std::make_unique<Texture>(Texture(file_name.c_str()));
 }
 

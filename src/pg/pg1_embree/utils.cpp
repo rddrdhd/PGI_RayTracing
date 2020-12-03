@@ -8,7 +8,6 @@ typedef uniform_real_distribution<float>            Distribution;
 
 auto uniform_generator = std::bind( Distribution( 0.0f, 1.0f ), Engine( 1 ) );
 
-
 float Random( const float range_min, const float range_max )
 {
 	float ksi;
