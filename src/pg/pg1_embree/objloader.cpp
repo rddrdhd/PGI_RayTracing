@@ -210,7 +210,7 @@ int LoadMTL( const char * file_name, const char * path, std::vector<Material *> 
 int LoadOBJ( const char * file_name, std::vector<Surface *> & surfaces, std::vector<Material *> & materials,
 	const bool flip_yz , const Vector3 default_color )
 {
-	// otevøení soouboru
+	// otevreni soouboru
 	FILE * file = fopen( file_name, "rt" );
 	if ( file == NULL )
 	{
@@ -236,7 +236,7 @@ int LoadOBJ( const char * file_name, std::vector<Surface *> & surfaces, std::vec
 
 	size_t number_of_items_read = fread( buffer, sizeof( *buffer ), file_size, file );
 
-	// otestujeme korektnost naètení dat
+	// otestujeme korektnost nacteni dat
 	if ( !feof( file ) && ( number_of_items_read != file_size ) )
 	{
 		printf( "Unexpected end of file encountered.\n" );
@@ -247,12 +247,12 @@ int LoadOBJ( const char * file_name, std::vector<Surface *> & surfaces, std::vec
 		return -1;
 	}	
 
-	buffer[number_of_items_read] = 0; // zajistíme korektní ukonèení øetìzce
+	buffer[number_of_items_read] = 0; // zajistime korektni ukonceni retezce
 
-	fclose( file ); // ukonèíme práci se souborem
+	fclose( file ); // ukoncime praci se souborem
 	file = NULL;
 
-	memcpy( buffer_backup, buffer, file_size + 1 ); // záloha bufferu
+	memcpy( buffer_backup, buffer, file_size + 1 ); // zaloha bufferu
 
 	printf( "Done.\n\n");
 
@@ -265,7 +265,7 @@ int LoadOBJ( const char * file_name, std::vector<Surface *> & surfaces, std::vec
 	const char delim[] = "\n";
 	char * line = strtok( buffer, delim );
 
-	// --- naèítání všech materiálových knihoven, první prùchod ---
+	// --- nacitani vsech materialovych knihoven, prvni pruchod ---
 	while ( line != NULL )
 	{
 		switch ( line[0] )
@@ -279,28 +279,28 @@ int LoadOBJ( const char * file_name, std::vector<Surface *> & surfaces, std::vec
 			break;
 		}
 
-		line = strtok( NULL, delim ); // naètení dalšího øádku
+		line = strtok( NULL, delim ); // nacteni dalsiho radku
 	}
 
-	memcpy( buffer, buffer_backup, file_size + 1 ); // obnovení bufferu po èinnosti strtok
+	memcpy( buffer, buffer_backup, file_size + 1 ); // obnovení bufferu po cinnosti strtok
 
 	for ( int i = 0; i < static_cast<int>( material_libraries.size() ); ++i )
 	{		
 		LoadMTL( material_libraries[i].c_str(), path, materials );
 	}
 
-	std::vector<Vector3> vertices; // celý jeden soubor
+	std::vector<Vector3> vertices; // cely jeden soubor
 	std::vector<Vector3> per_vertex_normals;
 	std::vector<Coord2f> texture_coords;	
 
 	line = strtok( buffer, delim );	
 
-	// --- naèítání všech souøadnic, druhý prùchod ---
+	// --- nacitani vsech souradnic, druhy pruchod ---
 	while ( line != NULL )
 	{
 		switch ( line[0] )
 		{
-		case 'v': // seznam vrcholù, normál nebo texturovacích souøadnic aktuální skupiny			
+		case 'v': // seznam vrcholu, normal nebo texturovacích souradnic aktualni skupiny			
 			{
 				switch ( line[1] )
 				{
@@ -322,7 +322,7 @@ int LoadOBJ( const char * file_name, std::vector<Surface *> & surfaces, std::vec
 					}
 					break;
 
-				case 'n': // normála vertexu
+				case 'n': // normala vertexu
 					{
 						Vector3 normal;
 						if ( flip_yz )
@@ -340,7 +340,7 @@ int LoadOBJ( const char * file_name, std::vector<Surface *> & surfaces, std::vec
 					}
 					break;
 
-				case 't': // texturovací souøadnice
+				case 't': // texturovaci souradnice
 					{
 						Coord2f texture_coord;
 						float z = 0;
@@ -354,10 +354,10 @@ int LoadOBJ( const char * file_name, std::vector<Surface *> & surfaces, std::vec
 			break;		
 		}
 
-		line = strtok( NULL, delim ); // naètení dalšího øádku
+		line = strtok( NULL, delim ); // nacteni dalsiho radku
 	}
 
-	memcpy( buffer, buffer_backup, file_size + 1 ); // obnovení bufferu po èinnosti strtok
+	memcpy( buffer, buffer_backup, file_size + 1 ); // obnoveni bufferu po cinnosti strtok
 
 	printf( "%I64u vertices, %I64u normals and %I64u texture coords.\n",
 		vertices.size(), per_vertex_normals.size(), texture_coords.size() );
@@ -365,16 +365,16 @@ int LoadOBJ( const char * file_name, std::vector<Surface *> & surfaces, std::vec
 	/// buffery pro naèítání øetìzcù	
 	char group_name[128];	
 	char material_name[128];
-	char vertices_indices[4][8 * 3 + 2];	// pomocný øetìzec pro naèítání indexù až 4 x "v/vt/vn"
-	char vertex_indices[3][8];				// pomocný øetìzec jednotlivých indexù "v", "vt" a "vn"	
+	char vertices_indices[4][8 * 3 + 2];	// pomocný retezec pro nacitani indexu az 4 x "v/vt/vn"
+	char vertex_indices[3][8];				// pomocný retezec pro nacitani index "v", "vt" a "vn"	
 
-	std::vector<Vertex> face_vertices; // pole všech vertexù právì naèítané face
+	std::vector<Vertex> face_vertices; // pole vsech vertexu prave nacitane face
 
-	int no_surfaces = 0; // poèet naètených ploch
+	int no_surfaces = 0; // pocet nactenych ploch
 
 	line = strtok( buffer, delim ); // reset
 
-	// --- naèítání jednotlivých objektù (group), tøetí prùchod ---
+	// --- nacitani jednotlivzch objektu (group), treti pruchod ---
 	while ( line != NULL )
 	{
 		switch ( line[0] )
@@ -413,8 +413,10 @@ int LoadOBJ( const char * file_name, std::vector<Surface *> & surfaces, std::vec
 
 		case 'f': // face
 			{
-				// ! pøedpokládáme pouze trojúhelníky !
-				// ! pøedpokládáme využití všech tøí položek v/vt/vn !				
+				RTrim(LTrim(line));
+			
+				// ! predpokladame pouze trojuhelniky !
+				// ! predpokladame vyuziti vsech tri poloyek v/vt/vn !				
 				int no_spaces = 0;
 				for ( int i = 0; i < static_cast<int>( strlen( line ) ); ++i )
 				{
@@ -471,7 +473,7 @@ int LoadOBJ( const char * file_name, std::vector<Surface *> & surfaces, std::vec
 			break;
 		}
 
-		line = strtok( NULL, delim ); // naètení dalšího øádku
+		line = strtok( NULL, delim ); // nacteni dalsiho radku
 	}
 
 	if ( face_vertices.size() > 0 )

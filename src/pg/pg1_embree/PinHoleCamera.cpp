@@ -1,6 +1,7 @@
 ﻿#include "stdafx.h"
 #include "PinHoleCamera.h"
 
+// Q1 Pinhole camera
 PinHoleCamera::PinHoleCamera( const int width, const int height, const float fov_y,
 	const Vector3 view_from, const Vector3 view_at )
 {
@@ -15,11 +16,11 @@ PinHoleCamera::PinHoleCamera( const int width, const int height, const float fov
 	f_y_ = height_ / (2 * _CMATH_::tan(fov_y_ / 2)); // focal length = vyska / 2tan(uhel/2)
 
 	// vektory pro transformaci prostoru z kameroveho do svetoveho (pravotocivy!)
-	Vector3 z_c = view_from_ - view_at_; // pohled kamery na prostor
+	Vector3 z_c = view_from_ - view_at_; // smer pohledu kamery na prostor
 	Vector3 x_c = up_.CrossProduct(z_c); // kolmice mezi pohledem a svislou osou
 	Vector3 y_c = z_c.CrossProduct(x_c); // 𝒂×𝒃= 𝑎𝑦𝑏𝑧−𝑎𝑧𝑏𝑦, 𝑎𝑧𝑏𝑥−𝑎𝑥𝑏𝑧, 𝑎𝑥𝑏𝑦−𝑎𝑦𝑏𝑥
 
-	// Matice musi byt z jednotkovych vektoru !
+	// Matice pro prevod mezi soustavami musi byt z jednotkovych vektoru !
 	z_c.Normalize();
 	x_c.Normalize();
 	y_c.Normalize();

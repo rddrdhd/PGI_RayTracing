@@ -18,10 +18,12 @@ SphericalMap::SphericalMap(const std::string& file_name)
 
 Color4f SphericalMap::get_texel(const float x, const float y, const float z) const
 {
+	// Q9 Environmental map
 	Vector3 vec{ x, z, y };
 	float u = 0.5 + atan2(vec.x, vec.z) / (2 * M_PI);
 	float v = 0.5 - asin(vec.y) / M_PI;
 	Color3f c = this->texture_->get_texel(u, v);
+
 
 	return Color4f{c.r, c.g, c.b, 1};
 }
