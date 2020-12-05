@@ -299,6 +299,9 @@ Color4f Raytracer::trace(RTCRay ray, int level ) {
 	rtcInitIntersectContext(&context);
 	rtcIntersect1(scene_, &context, &ray_hit);
 
+
+
+
 	// smer paprsku, ktery prave zpracovavam
 	Vector3 primary_ray_direction_vector(ray_hit.ray.dir_x, ray_hit.ray.dir_y, ray_hit.ray.dir_z);
 
@@ -317,6 +320,7 @@ Color4f Raytracer::trace(RTCRay ray, int level ) {
 		// get interpolated normal
 		rtcInterpolate0(geometry, ray_hit.hit.primID, ray_hit.hit.u, ray_hit.hit.v, RTC_BUFFER_TYPE_VERTEX_ATTRIBUTE, 0, &normal.x, 3);
 		Material* material = (Material*)(rtcGetGeometryUserData(geometry));
+	
 		Vector3 normal_vector(normal.x, normal.y, normal.z);
 
 		// vypocitam misto hitu
@@ -352,24 +356,30 @@ Color4f Raytracer::trace(RTCRay ray, int level ) {
 		return Color4f{ n.x, n.y,n.z, 1.0f };*/
 
 		float R = 0.0f;
+		float F0 = 0.0f;
 		Vector3 v = -primary_ray_direction_vector;
-
 		float cos1, cos2, Rs, Rp;
 		cos1 = abs(normal_vector.DotProduct(v));
+/*
 		float n1_n2_twice = ((n1 / n2) * (n1 / n2));
 		float one_minus_cos1_pow2 = (1 - (cos1 * cos1));
 		cos2 = sqrt(1 - (n1_n2_twice * one_minus_cos1_pow2));
 
 		//TODO chyba
 		//Governed by Fresnel equations
-		float uhel_2 =(float) (acos(cos2) * (180.0 / 3.141592653589793238463)) ;
+		
 		Rs = ((n2 * cos2 - n1 * cos1) / (n2 * cos2 + n1 * cos1)) * ((n2 * cos2 - n1 * cos1) / (n2 * cos2 + n1 * cos1));
 		Rp = ((n2 * cos1 - n1 * cos2) / (n2 * cos1 + n1 * cos2)) * ((n2 * cos1 - n1 * cos2) / (n2 * cos1 + n1 * cos2));
 		
 		R = (Rs + Rp) / 2; // coef o reflected ray
-		//if (R != R) R = pow(abs((n1-n2)/(n1+n2)),2); // if its NaN bc negativ num in sqrt
-		if (R != R) return Color4f{ 1,1,1,1 }; // if its NaN bc negativ num in sqrt
-		switch (material->type) {
+		*/
+
+		F0 = pow(((n1 - n2) / (n1 + n2)), 2);
+		R = (F0 + (1 - F0)) * pow((1 - cos1), 5);
+
+		R = F0 + (1 - F0) * (2*exp((-5.55473 * cos1 - 6.9814) * cos1));
+		if (R != R)R = pow(abs((n1 - n2) / (n1 + n2)), 2);
+	switch (material->type) {
 		case 4: //pruhledny a leskly material
 			RTCRay reflection_ray;
 			RTCRay refraction_ray;
@@ -381,10 +391,40 @@ Color4f Raytracer::trace(RTCRay ray, int level ) {
 			//refraction
 			refraction_ray = get_refraction_ray(primary_ray_direction_vector, normal_vector, n1, n2, hit_point);
 			Color4f refraction_color = trace(refraction_ray, level + 1);
-
-			// Q3 Lambert - Attenuation of Refracted Ray
-			// to know how long is the ray *inside*
 			RTCHit refraction_end;
+			// Q3 Lambert - Attenuation of Refracted Ray
+		/*	refraction_end.geomID = RTC_INVALID_GEOMETRY_ID;
+			refraction_end.primID = RTC_INVALID_GEOMETRY_ID;
+			refraction_end.Ng_x = 0.0f; // geometry normal
+			refraction_end.Ng_y = 0.0f;
+			refraction_end.Ng_z = 0.0f;
+
+			RTCRayHit refraction_ray_hit;
+			refraction_ray_hit.ray = refraction_ray;
+			refraction_ray_hit.hit = refraction_end;
+
+			RTCIntersectContext context;
+			rtcInitIntersectContext(&context);
+			rtcIntersect1(scene_, &context, &refraction_ray_hit);
+			local_r = exp(-(material->refractivity.x * refraction_ray_hit.ray.time));
+			local_g = exp(-(material->refractivity.y * refraction_ray_hit.ray.time));
+			local_b = exp(-(material->refractivity.z * refraction_ray_hit.ray.time));
+
+
+			// if we are *inside* and hit the end of *inside*
+			if (ray_hit.hit.geomID != RTC_INVALID_GEOMETRY_ID) {
+				local_r = exp(-( material->refractivity.x) * refraction_ray_hit.ray.tfar);
+				local_g = exp(-( material->refractivity.y) * refraction_ray_hit.ray.tfar);
+				local_b = exp(-( material->refractivity.z) * refraction_ray_hit.ray.tfar);
+			}
+			
+			final_color = {
+				((reflection_color.b * R) + (refraction_color.b * (1 - R))) * local_b,
+				((reflection_color.g * R) + (refraction_color.g * (1 - R))) * local_g,
+				((reflection_color.r * R) + (refraction_color.r * (1 - R))) * local_r,
+				1.0f
+			};*/
+			/*RTCHit refraction_end;
 			refraction_end.geomID = RTC_INVALID_GEOMETRY_ID;
 			refraction_end.primID = RTC_INVALID_GEOMETRY_ID;
 			refraction_end.Ng_x = 0.0f; // geometry normal
@@ -398,30 +438,18 @@ Color4f Raytracer::trace(RTCRay ray, int level ) {
 			RTCIntersectContext context;
 			rtcInitIntersectContext(&context);
 			rtcIntersect1(scene_, &context, &refraction_ray_hit);
+			*/
 
-			local_r = exp(-(1 - material->diffuse.x));
-			local_g = exp(-(1 - material->diffuse.y));
-			local_b = exp(-(1 - material->diffuse.z));
+			/*	local_r = exp(-(1 - material->diffuse.x));
+				local_g = exp(-(1 - material->diffuse.y));
+				local_b = exp(-(1 - material->diffuse.z));*/
+			local_r = exp(-(material->refractivity.x * ray_hit.ray.time));
+			local_g = exp(-(material->refractivity.y * ray_hit.ray.time));
+			local_b = exp(-(material->refractivity.z * ray_hit.ray.time));
 
-			// if we are *inside* and hit the end of *inside*
-			if (refraction_ray_hit.hit.geomID != RTC_INVALID_GEOMETRY_ID) { 
-				local_r = exp(-(1 - material->diffuse.x) * refraction_ray_hit.ray.tfar);
-				local_g = exp(-(1 - material->diffuse.y) * refraction_ray_hit.ray.tfar);
-				local_b = exp(-(1 - material->diffuse.z) * refraction_ray_hit.ray.tfar);
-			}
-			/*
-			final_color = {
-				((reflection_color.b * R) + (refraction_color.b * (1 - R))) * local_b,
-				((reflection_color.g * R) + (refraction_color.g * (1 - R))) * local_g,
-				((reflection_color.r * R) + (refraction_color.r * (1 - R))) * local_r,
-				1.0f
-			};*/
 			final_color = mix_srgb(reflection_color, refraction_color, R);
-			/*
-			final_color.r *= local_r;
-			final_color.g *= local_g;
-			final_color.b *= local_b;*/
 	
+			final_color = Color4f{ final_color.r * local_r, final_color.g * local_g, final_color.b * local_b, 1.0f };
 			return final_color;
 			break;
 		default:
@@ -487,12 +515,22 @@ Color4f Raytracer::get_pixel( const int x, const int y, const float t )
 	// generate primary ray and perform ray cast on the scene
 	RTCRay primary_ray = camera_.GenerateRay(x, y);
 	primary_ray.time = IOR_AIR;
-	return trace(primary_ray, 0);
+	return gamma(trace(primary_ray, 0));
+}
+
+Color4f Raytracer::gamma(Color4f input) {
+
+	float b = pow(input.b, gamma_level) * pow(input.b, gamma_level);
+	float g = pow(input.g, gamma_level) * pow(input.g, gamma_level);
+	float r = pow(input.r, gamma_level) * pow(input.r, gamma_level);
+
+
+	return Color4f{ b, g, r, 1.0f };
 }
 
 int Raytracer::Ui()
 {
-	static float f = 0.0f;
+	static float f = 0.5f;
 	static int counter = 0;
 
 	// Use a Begin/End pair to created a named window
@@ -507,6 +545,7 @@ int Raytracer::Ui()
 	//ImGui::Checkbox( "Another Window", &show_another_window );
 
 	ImGui::SliderFloat( "float", &f, 0.0f, 1.0f ); // Edit 1 float using a slider from 0.0f to 1.0f 
+	gamma_level = f;
 
 	//ImGui::ColorEdit3( "clear color", ( float* )&clear_color ); // Edit 3 floats representing a color
 
