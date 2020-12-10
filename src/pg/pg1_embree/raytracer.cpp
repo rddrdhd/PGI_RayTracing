@@ -8,32 +8,18 @@ using namespace std;
 // if tx1 < tx0, pak je porebuji swapnout - Ray vs AABB intersect
 // pro tx, ty, tz. Je to kvuli tomu, abychom meli konzistentn sematninku - 0 je bliz, 1 je dale
 
-Raytracer::Raytracer( const int width, const int height,
-	const float fov_y, const Vector3 view_from, const Vector3 view_at,
-	const char * config ) : SimpleGuiDX11( width, height )
-{
-	InitDeviceAndScene( config );
-
-	camera_ = PinHoleCamera( width, height, fov_y, view_from, view_at );
-}
-
-Raytracer::~Raytracer()
-{
-	ReleaseDeviceAndScene();
-}
-
+// funkce pro spravne scitani barev v linearnim prostoru
 float _compress(float u) {
 	if (u <= 0) return 0.0f;
 	if (u >= 1) return 1.0f;
-	if (u <= 0.00313080) return (float) (12.92 * u);
+	if (u <= 0.00313080) return (float)(12.92 * u);
 	return (float)(1.00 * pow(u, 1 / 2.4) - 0.055);
 }
-
 float _expand(float u) {
 	if (u <= 0) return 0.0f;
 	if (u >= 1) return 1.0f;
-	if (u <= 0.04045) return (float) (u/12.92);
-	return (float)pow((u+0.055)/1.055, 2.4);
+	if (u <= 0.04045) return (float)(u / 12.92);
+	return (float)pow((u + 0.055) / 1.055, 2.4);
 }
 Color4f compress(Color4f c_in) {
 	Color4f c_out{ _compress(c_in.b),_compress(c_in.g),_compress(c_in.r), 0.1f };
@@ -52,11 +38,26 @@ Color4f mix_linear(Color4f c0, Color4f c1, float alpha) {
 	};
 	return c_out;
 }
-
 Color4f mix_srgb(Color4f c0, Color4f c1, float alpha) {
-	Color4f out= compress(mix_linear(expand(c0), expand(c1), alpha));
+	Color4f out = compress(mix_linear(expand(c0), expand(c1), alpha));
 	return out;
 }
+
+
+Raytracer::Raytracer( const int width, const int height,
+	const float fov_y, const Vector3 view_from, const Vector3 view_at,
+	const char * config ) : SimpleGuiDX11( width, height )
+{
+	InitDeviceAndScene( config );
+
+	camera_ = PinHoleCamera( width, height, fov_y, view_from, view_at );
+}
+
+Raytracer::~Raytracer()
+{
+	ReleaseDeviceAndScene();
+}
+
 int Raytracer::InitDeviceAndScene( const char * config )
 {
 	device_ = rtcNewDevice( config );
@@ -98,8 +99,8 @@ void Raytracer::LoadScene(const std::string object_file_name, const std::string 
 	*/
 	// Bile svetlo
 	Vector3 white(1, 1, 1);
-	//LightSource white_light(Vector3(10, 0, 0), white, white, white);
-	LightSource white_light(Vector3(100,100,100), white, white, white);
+	LightSource white_light(Vector3(0, 0, 0), white, white, white);
+	//LightSource white_light(Vector3(100,100,100), white, white, white);
 	lights_.push_back(white_light);
 
 	// surfaces loop
@@ -162,28 +163,33 @@ void Raytracer::LoadScene(const std::string object_file_name, const std::string 
 	rtcCommitScene( scene_ );
 }
 
-bool Raytracer::isIlluminated(LightSource light, Vector3 hit_position, Vector3 normal)
-{
-	RTCHit light_hit;
-	light_hit.geomID = RTC_INVALID_GEOMETRY_ID;
-	light_hit.primID = RTC_INVALID_GEOMETRY_ID;
-	light_hit.Ng_x = 0.0f; // geometry normal
-	light_hit.Ng_y = 0.0f;
-	light_hit.Ng_z = 0.0f;
+RTCRayHit get_ray_hit(RTCRay ray, RTCScene scene) {
+	RTCHit hit;
+	hit.geomID = RTC_INVALID_GEOMETRY_ID;
+	hit.primID = RTC_INVALID_GEOMETRY_ID;
+	hit.Ng_x = 0.0f;
+	hit.Ng_y = 0.0f;
+	hit.Ng_z = 0.0f;
 
-	RTCRay light_ray = light.GenerateRay(hit_position.x, hit_position.y, hit_position.z);
-
-	RTCRayHit light_ray_hit;
-	light_ray_hit.ray = light_ray;
-	light_ray_hit.hit = light_hit;
+	// merge ray and hit structures
+	RTCRayHit ray_hit;
+	ray_hit.ray = ray;
+	ray_hit.hit = hit;
 
 	// intersect ray with the scene
 	RTCIntersectContext context;
 	rtcInitIntersectContext(&context);
-	rtcIntersect1(scene_, &context, &light_ray_hit); 
+	rtcIntersect1(scene, &context, &ray_hit);
+	return ray_hit;
+};
+
+bool Raytracer::isIlluminated(LightSource light, Vector3 hit_position, Vector3 normal)
+{
+	RTCRay ray = light.GenerateRay(hit_position.x, hit_position.y, hit_position.z);
+	RTCRayHit ray_hit = get_ray_hit(ray, scene_);
 
 	// Q5 - Hard shadows
-	return (light_ray_hit.hit.geomID != RTC_INVALID_GEOMETRY_ID);
+	return (ray_hit.hit.geomID != RTC_INVALID_GEOMETRY_ID);
 }
 
 RTCRay Raytracer::get_refraction_ray(Vector3 direction, Vector3 normal, float n1, float n2, Vector3 hit_point)
@@ -249,26 +255,13 @@ Color4f Raytracer::trace(RTCRay ray, int level ) {
 	
 	// TODO Q6 Bliliear interpolation http://mrl.cs.vsb.cz/people/fabian/pg1/pr03.pdf
 	// TODO Q11 Super Sampling, Q12 Depth of field,  Q13 Bounding Volume Hierarchy (construction and traversal), Q14 Surface Area Heuristic  http://mrl.cs.vsb.cz/people/fabian/pg1/pr04.pdf
-	RTCHit hit;
-	hit.geomID = RTC_INVALID_GEOMETRY_ID;
-	hit.primID = RTC_INVALID_GEOMETRY_ID;
-	hit.Ng_x = 0.0f; 
-	hit.Ng_y = 0.0f;
-	hit.Ng_z = 0.0f;
-
-	// merge ray and hit structures
-	RTCRayHit ray_hit;
-	ray_hit.ray = ray;
-	ray_hit.hit = hit;
-
-	// intersect ray with the scene
-	RTCIntersectContext context;
-	rtcInitIntersectContext(&context);
-	rtcIntersect1(scene_, &context, &ray_hit);
+	
+	RTCRayHit ray_hit = get_ray_hit(ray, scene_);
 
 	// smer paprsku, ktery prave zpracovavam
-	Vector3 primary_ray_direction_vector(ray_hit.ray.dir_x, ray_hit.ray.dir_y, ray_hit.ray.dir_z);
+	Vector3 direction_vector(ray_hit.ray.dir_x, ray_hit.ray.dir_y, ray_hit.ray.dir_z);
 
+	direction_vector.Normalize();
 	if (ray_hit.hit.geomID != RTC_INVALID_GEOMETRY_ID) // we hit something
 	{
 		RTCGeometry geometry = rtcGetGeometry(scene_, ray_hit.hit.geomID);
@@ -276,31 +269,28 @@ Color4f Raytracer::trace(RTCRay ray, int level ) {
 
 		// get interpolated normal
 		rtcInterpolate0(geometry, ray_hit.hit.primID, ray_hit.hit.u, ray_hit.hit.v, RTC_BUFFER_TYPE_VERTEX_ATTRIBUTE, 0, &normal.x, 3);
+		
 		Material* material = (Material*)(rtcGetGeometryUserData(geometry));
 	
 		Vector3 normal_vector(normal.x, normal.y, normal.z);
+		normal_vector.Normalize();
 
 		// vypocitam misto hitu
-		Vector3 hit_point = Vector3(ray_hit.ray.org_x, ray_hit.ray.org_y, ray_hit.ray.org_z) +
+		Vector3 hit_vector = Vector3(ray_hit.ray.org_x, ray_hit.ray.org_y, ray_hit.ray.org_z) +
 			Vector3(ray_hit.ray.dir_x, ray_hit.ray.dir_y, ray_hit.ray.dir_z) * ray_hit.ray.tfar;
 
-		Color4f final_color;
-
-		float local_r, local_g, local_b;
-		float n1, n2;
+		float n1, n2, attenuation_red, attenuation_green, attenuation_blue;
+		
 		if (ray.time == IOR_AIR) {
-			n1 = IOR_AIR;
-			n2 = material->ior;
+			n1 = IOR_AIR; // ray is in air
+			n2 = material->ior; // ray is hitting material
 		} else {
-			n1 = material->ior;
-			n2 = IOR_AIR;
+			n1 = material->ior;// ray is in material
+			n2 = IOR_AIR; // ray is going out
 		}
 
-		normal_vector.Normalize();
-		primary_ray_direction_vector.Normalize();
-
-		if (normal_vector.DotProduct(primary_ray_direction_vector) > 0) {
-			// fix orientace normal
+		if (normal_vector.DotProduct(direction_vector) > 0) {
+			// fix normal orientation
 			normal_vector = -normal_vector;
 		}
 
@@ -312,199 +302,64 @@ Color4f Raytracer::trace(RTCRay ray, int level ) {
 
 		return Color4f{ n.x, n.y,n.z, 1.0f };*/
 
-		Vector3 v = -primary_ray_direction_vector;
-		float R, F0, cos1;
-		cos1 = abs(normal_vector.DotProduct(v));
-		F0 = pow(((n1 - n2) / (n1 + n2)), 2);
-		R = (F0 + (1 - F0)) * pow((1 - cos1), 5);
-		if (R != R)R = pow(abs((n1 - n2) / (n1 + n2)), 2);
 
-		if (material->type == 4 && level <= 4) {
-			RTCRay reflection_ray;
-			RTCRay refraction_ray;
-
-			// reflection
-			reflection_ray = get_reflection_ray(primary_ray_direction_vector, normal_vector, hit_point, n1);
-			Color4f reflection_color = trace(reflection_ray, level + 1);
-
-			//refraction
-			refraction_ray = get_refraction_ray(primary_ray_direction_vector, normal_vector, n1, n2, hit_point);
-			Color4f refraction_color = trace(refraction_ray, level + 1);
-
-			// Q3 Lambert - Attenuation of Refracted Ray
-			/*
-			RTCHit refraction_end;
-			refraction_end.geomID = RTC_INVALID_GEOMETRY_ID;
-			refraction_end.primID = RTC_INVALID_GEOMETRY_ID;
-			refraction_end.Ng_x = 0.0f; // geometry normal
-			refraction_end.Ng_y = 0.0f;
-			refraction_end.Ng_z = 0.0f;
-
-			RTCRayHit refraction_ray_hit;
-			refraction_ray_hit.ray = refraction_ray;
-			refraction_ray_hit.hit = refraction_end;
-
-			RTCIntersectContext context;
-			rtcInitIntersectContext(&context);
-			rtcIntersect1(scene_, &context, &refraction_ray_hit);
-			local_r = exp(-(material->refractivity.x * refraction_ray_hit.ray.time));
-			local_g = exp(-(material->refractivity.y * refraction_ray_hit.ray.time));
-			local_b = exp(-(material->refractivity.z * refraction_ray_hit.ray.time));
-
-			// if we are *inside* and hit the end of *inside*
-			if (ray_hit.hit.geomID != RTC_INVALID_GEOMETRY_ID) {
-				local_r = exp(-( material->refractivity.x) * refraction_ray_hit.ray.tfar);
-				local_g = exp(-( material->refractivity.y) * refraction_ray_hit.ray.tfar);
-				local_b = exp(-( material->refractivity.z) * refraction_ray_hit.ray.tfar);
-			}*/
-			// TODO - delka paprsku uvnitr
-				local_r = exp(-(1 - material->diffuse.x));
-				local_g = exp(-(1 - material->diffuse.y));
-				local_b = exp(-(1 - material->diffuse.z));
-		/*	final_color = {
-			((reflection_color.b * R) + (refraction_color.b * (1 - R))) * local_b,
-			((reflection_color.g * R) + (refraction_color.g * (1 - R))) * local_g,
-			((reflection_color.r * R) + (refraction_color.r * (1 - R))) * local_r,
-			1.0f
-			};*/
-			final_color = mix_srgb(reflection_color, refraction_color, R);
-
-			final_color = Color4f{ final_color.r * local_r, final_color.g * local_g, final_color.b * local_b, 1.0f };
-			return final_color;
-		}
-		else {
-			float r, g, b;
-			r = 0;
-			g = 0;
-			b = 0;
-
-			for (LightSource light : this->lights_) {
-
-				if (isIlluminated(light, Vector3(hit_point.x, hit_point.y, hit_point.z), Vector3(normal.x, normal.y, normal.z))) {
-
-					//vypocitam vektor z hitu do svetla
-					Vector3 l(hit_point.x - light.position_.x, hit_point.y - light.position_.y, hit_point.z - light.position_.z);
-					l.Normalize();
-
-					// vypocitam vektor z hitu do oka
-					Vector3 v(ray.org_x - ray.dir_x, ray.org_y - ray.dir_y, ray.org_z - ray.dir_z);
-					v.Normalize();
-
-					Vector3 l_r = 2 * (normal_vector.DotProduct(l)) * normal_vector - l;
-					l_r.Normalize();
-					double gamma = material->shininess;
-
-					double i_d = light.diffuse_.x;
-					double m_d = material->diffuse.x;
-					double i_s = light.spectular_.x;
-					double m_s = material->specular.x;
-
-					// Q4 Whitted illumination model
-					r += (i_d * m_d * (normal_vector.DotProduct(l)) + i_s * m_s * (pow(v.DotProduct(l_r), gamma)));
-
-					i_d = light.diffuse_.y;
-					m_d = material->diffuse.y;
-					i_s = light.spectular_.y;
-					m_s = material->specular.y;
-					g += (i_d * m_d * (normal_vector.DotProduct(l)) + i_s * m_s * (pow(v.DotProduct(l_r), gamma)));
-
-					i_d = light.diffuse_.z;
-					m_d = material->diffuse.z;
-					i_s = light.spectular_.z;
-					m_s = material->specular.z;
-					b += (i_d * m_d * (normal_vector.DotProduct(l)) + i_s * m_s * (pow(v.DotProduct(l_r), gamma)));
-
-				}
-			}
-
-			Vector3 ambient = material->ambient * 0.5;
-			return Color4f{ r + ambient.x, g + ambient.y, b + ambient.z, 1.0f };
+		if (level >= 4) { // 
+			return this->background_.get_texel(
+				direction_vector.x,
+				direction_vector.y,
+				direction_vector.z);
 		}
 
-	/*switch (material->type) {
-		case 4: //pruhledny a leskly material
-			RTCRay reflection_ray;
-			RTCRay refraction_ray;
+		Vector3 v = -direction_vector;
+		float R, alpha, F0, cos1;
+
+		switch (material->type) {
+		case 4: // shader 4 = dielectric = reflection & refraction
+			RTCRay reflection_ray, refraction_ray;
+			Color4f reflection_color, refraction_color, attenuation;
 
 			// reflection
-			reflection_ray = get_reflection_ray(primary_ray_direction_vector, normal_vector, hit_point, n1);
-			Color4f reflection_color = trace(reflection_ray, level + 1);
+			reflection_ray = get_reflection_ray(direction_vector, normal_vector, hit_vector, n1);
+			reflection_color = trace(reflection_ray, level + 1);
 
-			//refraction
-			refraction_ray = get_refraction_ray(primary_ray_direction_vector, normal_vector, n1, n2, hit_point);
-			Color4f refraction_color = trace(refraction_ray, level + 1);
+			// refraction
+			refraction_ray = get_refraction_ray(direction_vector, normal_vector, n1, n2, hit_vector);
+			refraction_color = trace(refraction_ray, level + 1);
 
 			// Q3 Lambert - Attenuation of Refracted Ray
-			/*	refraction_end.geomID = RTC_INVALID_GEOMETRY_ID;
-			refraction_end.primID = RTC_INVALID_GEOMETRY_ID;
-			refraction_end.Ng_x = 0.0f; // geometry normal
-			refraction_end.Ng_y = 0.0f;
-			refraction_end.Ng_z = 0.0f;
+			if (true){//n2 == material->ior) {
+				attenuation.r = exp(-(1 - material->diffuse.x) * ray_hit.ray.tfar);
+				attenuation.g = exp(-(1 - material->diffuse.y) * ray_hit.ray.tfar);
+				attenuation.b = exp(-(1 - material->diffuse.z) * ray_hit.ray.tfar);
 
-			RTCRayHit refraction_ray_hit;
-			refraction_ray_hit.ray = refraction_ray;
-			refraction_ray_hit.hit = refraction_end;
+				reflection_color.r *= attenuation.r;
+				reflection_color.g *= attenuation.g;
+				reflection_color.b *= attenuation.b;
 
-			RTCIntersectContext context;
-			rtcInitIntersectContext(&context);
-			rtcIntersect1(scene_, &context, &refraction_ray_hit);
-			local_r = exp(-(material->refractivity.x * refraction_ray_hit.ray.time));
-			local_g = exp(-(material->refractivity.y * refraction_ray_hit.ray.time));
-			local_b = exp(-(material->refractivity.z * refraction_ray_hit.ray.time));
-
-
-			// if we are *inside* and hit the end of *inside*
-			if (ray_hit.hit.geomID != RTC_INVALID_GEOMETRY_ID) {
-				local_r = exp(-( material->refractivity.x) * refraction_ray_hit.ray.tfar);
-				local_g = exp(-( material->refractivity.y) * refraction_ray_hit.ray.tfar);
-				local_b = exp(-( material->refractivity.z) * refraction_ray_hit.ray.tfar);
+				refraction_color.r *= attenuation.r;
+				refraction_color.g *= attenuation.g;
+				refraction_color.b *= attenuation.b;
 			}
-			
-			final_color = {
-				((reflection_color.b * R) + (refraction_color.b * (1 - R))) * local_b,
-				((reflection_color.g * R) + (refraction_color.g * (1 - R))) * local_g,
-				((reflection_color.r * R) + (refraction_color.r * (1 - R))) * local_r,
-				1.0f//
-			};
-			RTCHit refraction_end;
-			refraction_end.geomID = RTC_INVALID_GEOMETRY_ID;
-			refraction_end.primID = RTC_INVALID_GEOMETRY_ID;
-			refraction_end.Ng_x = 0.0f; // geometry normal
-			refraction_end.Ng_y = 0.0f;
-			refraction_end.Ng_z = 0.0f;
 
-			RTCRayHit refraction_ray_hit;
-			refraction_ray_hit.ray = refraction_ray;
-			refraction_ray_hit.hit = refraction_end;
-
-			RTCIntersectContext context;
-			rtcInitIntersectContext(&context);
-			rtcIntersect1(scene_, &context, &refraction_ray_hit);
-			
-			/*	local_r = exp(-(1 - material->diffuse.x));
-				local_g = exp(-(1 - material->diffuse.y));
-				local_b = exp(-(1 - material->diffuse.z));//
-			local_r = exp(-(material->refractivity.x * refraction_ray_hit.ray.tfar));
-			local_g = exp(-(material->refractivity.y * refraction_ray_hit.ray.tfar));
-			local_b = exp(-(material->refractivity.z * refraction_ray_hit.ray.tfar));
-
-			final_color = mix_srgb(reflection_color, refraction_color, R);
-	
-			//final_color = Color4f{ final_color.r * local_r, final_color.g * local_g, final_color.b * local_b, 1.0f };
-			return final_color;
+			// compute the ratio between reflection and refraction
+			cos1 = abs(normal_vector.DotProduct(v));
+			alpha = (n1 - n2) / (n1 + n2);
+			R = (alpha*alpha + (1 - alpha*alpha)) * pow((1 - cos1), 5);
+			if (R != R)R = alpha*alpha;
+		
+			return mix_srgb(reflection_color, refraction_color, R);
 			break;
+
 		default:
-			
 			float r = 0;
 			float g = 0;
 			float b = 0;
 
 			for (LightSource light : this->lights_) {
-
-				if (isIlluminated(light, Vector3(hit_point.x, hit_point.y, hit_point.z), Vector3(normal.x, normal.y, normal.z))) {
+				if (isIlluminated(light, hit_vector, normal_vector)) {
 
 					//vypocitam vektor z hitu do svetla
-					Vector3 l(hit_point.x - light.position_.x, hit_point.y - light.position_.y, hit_point.z - light.position_.z);
+					Vector3 l(hit_vector.x - light.position_.x, hit_vector.y - light.position_.y, hit_vector.z - light.position_.z);
 					l.Normalize();
 
 					// vypocitam vektor z hitu do oka
@@ -515,40 +370,37 @@ Color4f Raytracer::trace(RTCRay ray, int level ) {
 					l_r.Normalize();
 					double gamma = material->shininess;
 
-					// vypocitam jednotlive barvy i s utlumem
+					// vypocitam jednotlive barvy
 					double i_d = light.diffuse_.x;
-					double m_d = material->diffuse.x;
 					double i_s = light.spectular_.x;
+					double m_d = material->diffuse.x;
 					double m_s = material->specular.x;
 
 					// Q4 Whitted illumination model
 					r += (i_d * m_d * (normal_vector.DotProduct(l)) + i_s * m_s * (pow(v.DotProduct(l_r), gamma)));
 
 					i_d = light.diffuse_.y;
-					m_d = material->diffuse.y;
 					i_s = light.spectular_.y;
+					m_d = material->diffuse.y;
 					m_s = material->specular.y;
 					g += (i_d * m_d * (normal_vector.DotProduct(l)) + i_s * m_s * (pow(v.DotProduct(l_r), gamma)));
 
 					i_d = light.diffuse_.z;
-					m_d = material->diffuse.z;
 					i_s = light.spectular_.z;
+					m_d = material->diffuse.z;
 					m_s = material->specular.z;
 					b += (i_d * m_d * (normal_vector.DotProduct(l)) + i_s * m_s * (pow(v.DotProduct(l_r), gamma)));
-
 				}
 			}
-
-			Vector3 ambient = material->ambient * 0.5;
-			return Color4f{ r + ambient.x, g + ambient.y, b + ambient.z, 1.0f };
-		}*/
+			return Color4f{ r, g , b , 1.0f };
+		}
 
 	}
-	// pokud se nic nestalo, vratim pozadi
+	// pokud se nic nehitlo, vratim pozadi
 	return this->background_.get_texel(
-		primary_ray_direction_vector.x,
-		primary_ray_direction_vector.y,
-		primary_ray_direction_vector.z);
+		direction_vector.x,
+		direction_vector.y,
+		direction_vector.z);
 }
 
 Color4f Raytracer::get_pixel( const int x, const int y, const float t )
@@ -557,6 +409,7 @@ Color4f Raytracer::get_pixel( const int x, const int y, const float t )
 	// TODO supersampling
 	RTCRay primary_ray = camera_.GenerateRay(x, y);
 	primary_ray.time = IOR_AIR;
+
 	return gamma(trace(primary_ray, 0));
 }
 
@@ -565,7 +418,6 @@ Color4f Raytracer::gamma(Color4f input) {
 	float b = pow(input.b, gamma_level) * pow(input.b, gamma_level);
 	float g = pow(input.g, gamma_level) * pow(input.g, gamma_level);
 	float r = pow(input.r, gamma_level) * pow(input.r, gamma_level);
-
 
 	return Color4f{ b, g, r, 1.0f };
 }
