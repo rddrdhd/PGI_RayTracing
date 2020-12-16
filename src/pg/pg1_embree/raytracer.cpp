@@ -3,46 +3,11 @@
 #include "objloader.h"
 #include "tutorials.h"
 #include "material.h"
+#include "utils.h"
 #include <iostream>
 using namespace std;
 // if tx1 < tx0, pak je porebuji swapnout - Ray vs AABB intersect
 // pro tx, ty, tz. Je to kvuli tomu, abychom meli konzistentn sematninku - 0 je bliz, 1 je dale
-
-// funkce pro spravne scitani barev v linearnim prostoru
-float _compress(float u) {
-	if (u <= 0) return 0.0f;
-	if (u >= 1) return 1.0f;
-	if (u <= 0.00313080) return (float)(12.92 * u);
-	return (float)(1.00 * pow(u, 1 / 2.4) - 0.055);
-}
-float _expand(float u) {
-	if (u <= 0) return 0.0f;
-	if (u >= 1) return 1.0f;
-	if (u <= 0.04045) return (float)(u / 12.92);
-	return (float)pow((u + 0.055) / 1.055, 2.4);
-}
-Color4f compress(Color4f c_in) {
-	Color4f c_out{ _compress(c_in.b),_compress(c_in.g),_compress(c_in.r), 0.1f };
-	return c_out;
-}
-Color4f expand(Color4f c_in) {
-	Color4f c_out{ _expand(c_in.b),_expand(c_in.g),_expand(c_in.r),0.1f };
-	return c_out;
-}
-Color4f mix_linear(Color4f c0, Color4f c1, float alpha) {
-	Color4f c_out{
-		(alpha * c0.b + (1 - alpha) * c1.b),
-		(alpha * c0.g + (1 - alpha) * c1.g),
-		(alpha * c0.r + (1 - alpha) * c1.r),
-		1.0f
-	};
-	return c_out;
-}
-Color4f mix_srgb(Color4f c0, Color4f c1, float alpha) {
-	Color4f out = compress(mix_linear(expand(c0), expand(c1), alpha));
-	return out;
-}
-
 
 Raytracer::Raytracer( const int width, const int height,
 	const float fov_y, const Vector3 view_from, const Vector3 view_at,
@@ -85,8 +50,8 @@ void Raytracer::LoadScene(const std::string object_file_name, const std::string 
 	const int no_surfaces = LoadOBJ(object_file_name.c_str(), surfaces_, materials_);
 	this->background_ = SphericalMap(background_file_name);
 	
-	/* //Barevna svetla
-	Vector3 red(0.8, 0.2, 0.2);
+	 //Barevna svetla
+/*	Vector3 red(0.8, 0.2, 0.2);
 	Vector3 green(0.2, 0.8, 0.2);
 	Vector3 blue(0.2, 0.2, 0.8);
 	LightSource red_light(Vector3(-10,0,0), red, red, red);
@@ -350,49 +315,66 @@ Color4f Raytracer::trace(RTCRay ray, int level ) {
 			return mix_srgb(reflection_color, refraction_color, R);
 			break;
 
-		default:
-			float r = 0;
-			float g = 0;
-			float b = 0;
+		default: // Q4 Phong
+			// define final color variables
+			float blue = 0; 
+			float green = 0;
+			float red = 0;
+			// define helper variables for formulas
+			float m_d_r, m_d_g, m_d_b; // material diffuse
+			float i_d_r, i_d_g, i_d_b; // light diffuse
+			float i_s_r, i_s_g, i_s_b; // light spectacular
+			float m_s_r, m_s_g, m_s_b; // material spectacular
+			float gamma;
+			// texture
+			Texture* diffuseTexture = material->get_texture(Material::kDiffuseMapSlot);
+			if (diffuseTexture == nullptr) {
+				m_d_r = material->diffuse.z;
+				m_d_g = material->diffuse.y;
+				m_d_b = material->diffuse.x;
+			} else {
+				Coord2f tex_coord;
+				rtcInterpolate0(geometry, ray_hit.hit.primID, ray_hit.hit.u, ray_hit.hit.v, RTC_BUFFER_TYPE_VERTEX_ATTRIBUTE, 1, &tex_coord.u, 2);
+				Color3f texel = diffuseTexture->get_texel(tex_coord.u, 1.0f - tex_coord.v);
+				m_d_r = texel.r;
+				m_d_g = texel.g;
+				m_d_b = texel.b;
+			}
 
 			for (LightSource light : this->lights_) {
 				if (isIlluminated(light, hit_vector, normal_vector)) {
+					Vector3 light_vector, camera_vector;
+					//  hit to light
+					light_vector = Vector3(hit_vector.x - light.position_.x, hit_vector.y - light.position_.y, hit_vector.z - light.position_.z);
+					light_vector.Normalize();
+					//  camera to hit
+					camera_vector = Vector3(ray.org_x - ray.dir_x, ray.org_y - ray.dir_y, ray.org_z - ray.dir_z);
+					camera_vector.Normalize();
+					
+					gamma = material->shininess;
+					i_d_r = light.diffuse_.z;
+					i_d_g = light.diffuse_.y;
+					i_d_b = light.diffuse_.x;
+					i_s_r = light.spectular_.z;
+					i_s_g = light.spectular_.y;
+					i_s_b = light.spectular_.x;
+					m_s_r = material->specular.z;
+					m_s_g = material->specular.y;
+					m_s_b = material->specular.x;
 
-					//vypocitam vektor z hitu do svetla
-					Vector3 l(hit_vector.x - light.position_.x, hit_vector.y - light.position_.y, hit_vector.z - light.position_.z);
-					l.Normalize();
-
-					// vypocitam vektor z hitu do oka
-					Vector3 v(ray.org_x - ray.dir_x, ray.org_y - ray.dir_y, ray.org_z - ray.dir_z);
-					v.Normalize();
-
-					Vector3 l_r = 2 * (normal_vector.DotProduct(l)) * normal_vector - l;
+					//Vector3 l_r{ -light_vector.x, -light_vector.y, light_vector.z };
+					Vector3 l_r = 2 * (normal_vector.DotProduct(light_vector)) * normal_vector - light_vector;
 					l_r.Normalize();
-					double gamma = material->shininess;
 
-					// vypocitam jednotlive barvy
-					double i_d = light.diffuse_.x;
-					double i_s = light.spectular_.x;
-					double m_d = material->diffuse.x;
-					double m_s = material->specular.x;
-
-					// Q4 Whitted illumination model
-					r += (i_d * m_d * (normal_vector.DotProduct(l)) + i_s * m_s * (pow(v.DotProduct(l_r), gamma)));
-
-					i_d = light.diffuse_.y;
-					i_s = light.spectular_.y;
-					m_d = material->diffuse.y;
-					m_s = material->specular.y;
-					g += (i_d * m_d * (normal_vector.DotProduct(l)) + i_s * m_s * (pow(v.DotProduct(l_r), gamma)));
-
-					i_d = light.diffuse_.z;
-					i_s = light.spectular_.z;
-					m_d = material->diffuse.z;
-					m_s = material->specular.z;
-					b += (i_d * m_d * (normal_vector.DotProduct(l)) + i_s * m_s * (pow(v.DotProduct(l_r), gamma)));
+					blue += (i_d_b * m_d_b * (normal_vector.DotProduct(light_vector)) 
+						+ i_s_b * m_s_b * (pow(camera_vector.DotProduct(l_r), gamma)));
+					green += (i_d_g * m_d_g * (normal_vector.DotProduct(light_vector)) 
+						+ i_s_g * m_s_g * (pow(camera_vector.DotProduct(l_r), gamma)));
+					red += (i_d_r * m_d_r * (normal_vector.DotProduct(light_vector)) 
+						+ i_s_r * m_s_r * (pow(camera_vector.DotProduct(l_r), gamma)));
 				}
 			}
-			return Color4f{ r, g , b , 1.0f };
+			return Color4f{ blue, green , red , 1.0f };
 		}
 
 	}

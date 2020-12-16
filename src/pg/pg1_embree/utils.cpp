@@ -1,4 +1,5 @@
 #include "stdafx.h"
+#include "raytracer.h"
 
 using std::mt19937;
 using std::uniform_real_distribution;
@@ -197,4 +198,44 @@ char * RTrim( char * s )
 char * Trim( char * s )
 {
 	return RTrim( LTrim( s ) );
+}
+
+// funkce pro spravne scitani barev v linearnim prostoru
+float _compress(float u) {
+	if (u <= 0) return 0.0f;
+	if (u >= 1) return 1.0f;
+	if (u <= 0.00313080) return (float)(12.92 * u);
+	return (float)(1.00 * pow(u, 1 / 2.4) - 0.055);
+}
+
+float _expand(float u) {
+	if (u <= 0) return 0.0f;
+	if (u >= 1) return 1.0f;
+	if (u <= 0.04045) return (float)(u / 12.92);
+	return (float)pow((u + 0.055) / 1.055, 2.4);
+}
+
+Color4f compress(Color4f c_in) {
+	Color4f c_out{ _compress(c_in.b),_compress(c_in.g),_compress(c_in.r), 0.1f };
+	return c_out;
+}
+
+Color4f expand(Color4f c_in) {
+	Color4f c_out{ _expand(c_in.b),_expand(c_in.g),_expand(c_in.r),0.1f };
+	return c_out;
+}
+
+Color4f mix_linear(Color4f c0, Color4f c1, float alpha) {
+	Color4f c_out{
+		(alpha * c0.b + (1 - alpha) * c1.b),
+		(alpha * c0.g + (1 - alpha) * c1.g),
+		(alpha * c0.r + (1 - alpha) * c1.r),
+		1.0f
+	};
+	return c_out;
+}
+
+Color4f mix_srgb(Color4f c0, Color4f c1, float alpha) {
+	Color4f out = compress(mix_linear(expand(c0), expand(c1), alpha));
+	return out;
 }

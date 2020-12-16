@@ -8,7 +8,7 @@ const char Material::kOpacityMapSlot = 3;
 
 Material::Material()
 {
-	// defaultní materiál
+	// default material
 	ambient = Vector3( 0.1f, 0.1f, 0.1f );
 	diffuse = Vector3( 0.4f, 0.4f, 0.4f );
 	specular = Vector3( 0.8f, 0.8f, 0.8f );	

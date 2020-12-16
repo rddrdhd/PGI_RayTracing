@@ -101,5 +101,11 @@ char * RTrim( char * s );
 \return Ukazatel na novou pozici v tomtéž øetìzci
 */
 char * Trim( char *s );
+float _compress(float u);
+float _expand(float u);
+Color4f compress(Color4f c_in);
+Color4f expand(Color4f c_in);
+Color4f mix_linear(Color4f c0, Color4f c1, float alpha);
+Color4f mix_srgb(Color4f c0, Color4f c1, float alpha);
 
 #endif
