@@ -64,8 +64,8 @@ void Raytracer::LoadScene(const std::string object_file_name, const std::string 
 	*/
 	// Bile svetlo
 	Vector3 white(1, 1, 1);
-	LightSource white_light(Vector3(0, 0, 0), white, white, white);
-	//LightSource white_light(Vector3(100,100,100), white, white, white);
+	LightSource white_light(Vector3(500,100,0), white, white, white);
+	//LightSource white_light(Vector3(300,100,-100), white, white, white);
 	lights_.push_back(white_light);
 
 	// surfaces loop
@@ -153,8 +153,19 @@ bool Raytracer::isIlluminated(LightSource light, Vector3 hit_position, Vector3 n
 	RTCRay ray = light.GenerateRay(hit_position.x, hit_position.y, hit_position.z);
 	RTCRayHit ray_hit = get_ray_hit(ray, scene_);
 
+	if (ray_hit.hit.geomID != RTC_INVALID_GEOMETRY_ID) {
+		RTCGeometry geometry = rtcGetGeometry(scene_, ray_hit.hit.geomID);
+		Material* material = (Material*)(rtcGetGeometryUserData(geometry));
+		if (material->type == 4) {
+			Vector3 org{ ray.org_x, ray.org_y, ray.org_z };
+			Vector3 d{ ray.dir_x, ray.dir_y, ray.dir_z };
+			Vector3 new_hitPoint = org + d * ray_hit.ray.tfar;
+			return isIlluminated(light, new_hitPoint, normal);
+		}
+		return false;
+	}
 	// Q5 - Hard shadows
-	return (ray_hit.hit.geomID != RTC_INVALID_GEOMETRY_ID);
+	return true;// (ray_hit.hit.geomID != RTC_INVALID_GEOMETRY_ID);
 }
 
 RTCRay Raytracer::get_refraction_ray(Vector3 direction, Vector3 normal, float n1, float n2, Vector3 hit_point)
@@ -268,11 +279,11 @@ Color4f Raytracer::trace(RTCRay ray, int level ) {
 		return Color4f{ n.x, n.y,n.z, 1.0f };*/
 
 
-		if (level >= 4) { // 
-			return this->background_.get_texel(
+		if (level >= 7) { // 
+			return Color4f{ 0,0,0,1 };/*this->background_.get_texel(
 				direction_vector.x,
 				direction_vector.y,
-				direction_vector.z);
+				direction_vector.z);*/
 		}
 
 		Vector3 v = -direction_vector;
@@ -289,30 +300,25 @@ Color4f Raytracer::trace(RTCRay ray, int level ) {
 
 			// refraction
 			refraction_ray = get_refraction_ray(direction_vector, normal_vector, n1, n2, hit_vector);
-			refraction_color = trace(refraction_ray, level + 1);
+			if (refraction_ray.dir_x == refraction_ray.dir_x) {
+				refraction_color = trace(refraction_ray, level + 1);
 
-			// Q3 Lambert - Attenuation of Refracted Ray
-			if (true){//n2 == material->ior) {
 				attenuation.r = exp(-(1 - material->diffuse.x) * ray_hit.ray.tfar);
 				attenuation.g = exp(-(1 - material->diffuse.y) * ray_hit.ray.tfar);
 				attenuation.b = exp(-(1 - material->diffuse.z) * ray_hit.ray.tfar);
 
-				reflection_color.r *= attenuation.r;
-				reflection_color.g *= attenuation.g;
-				reflection_color.b *= attenuation.b;
+				// Q3 Lambert - Attenuation of Refracted Ray
+				// compute the ratio between reflection and refraction
+				cos1 = abs(normal_vector.DotProduct(v));
+				alpha = (n1 - n2) / (n1 + n2);
+				R = (alpha * alpha + (1 - (alpha * alpha))) * pow((1 - cos1), 5);
+				if (R != R)R = alpha * alpha; // if R==NaN
 
-				refraction_color.r *= attenuation.r;
-				refraction_color.g *= attenuation.g;
-				refraction_color.b *= attenuation.b;
+				Color4f c = mix_srgb(reflection_color, refraction_color, R);
+				return Color4f{ c.r * attenuation.r, c.g * attenuation.g, c.b * attenuation.b, 1 };
 			}
-
-			// compute the ratio between reflection and refraction
-			cos1 = abs(normal_vector.DotProduct(v));
-			alpha = (n1 - n2) / (n1 + n2);
-			R = (alpha*alpha + (1 - alpha*alpha)) * pow((1 - cos1), 5);
-			if (R != R)R = alpha*alpha;
-		
-			return mix_srgb(reflection_color, refraction_color, R);
+			return reflection_color;
+			
 			break;
 
 		default: // Q4 Phong
@@ -347,6 +353,7 @@ Color4f Raytracer::trace(RTCRay ray, int level ) {
 					//  hit to light
 					light_vector = Vector3(hit_vector.x - light.position_.x, hit_vector.y - light.position_.y, hit_vector.z - light.position_.z);
 					light_vector.Normalize();
+					
 					//  camera to hit
 					camera_vector = Vector3(ray.org_x - ray.dir_x, ray.org_y - ray.dir_y, ray.org_z - ray.dir_z);
 					camera_vector.Normalize();

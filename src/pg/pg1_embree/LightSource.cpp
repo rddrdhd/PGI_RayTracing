@@ -24,7 +24,7 @@ RTCRay LightSource::GenerateRay(const float x, const float y, const float z) con
 	ray.tnear = 0.01f;
 
 	// vzdalenost k hitu
-	ray.tfar = Vector3(position_-dir).L2Norm();
+	ray.tfar = Vector3(position_.x-dir.x,position_.y-dir.y,position_.z-dir.z).L2Norm();
 
 	ray.time = 0.0f;
 
