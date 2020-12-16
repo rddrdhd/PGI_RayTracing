@@ -151,15 +151,15 @@ RTCRayHit get_ray_hit(RTCRay ray, RTCScene scene) {
 bool Raytracer::isIlluminated(LightSource light, Vector3 hit_position, Vector3 normal)
 {
 	RTCRay ray = light.GenerateRay(hit_position.x, hit_position.y, hit_position.z);
-	RTCRayHit ray_hit = get_ray_hit(ray, scene_);
+	RTCRayHit rh = get_ray_hit(ray, scene_);
 
-	if (ray_hit.hit.geomID != RTC_INVALID_GEOMETRY_ID) {
-		RTCGeometry geometry = rtcGetGeometry(scene_, ray_hit.hit.geomID);
+	if (rh.hit.geomID != RTC_INVALID_GEOMETRY_ID) {
+		RTCGeometry geometry = rtcGetGeometry(scene_, rh.hit.geomID);
 		Material* material = (Material*)(rtcGetGeometryUserData(geometry));
 		if (material->type == 4) {
-			Vector3 org{ ray.org_x, ray.org_y, ray.org_z };
-			Vector3 d{ ray.dir_x, ray.dir_y, ray.dir_z };
-			Vector3 new_hitPoint = org + d * ray_hit.ray.tfar;
+			Vector3 org{ rh.ray.org_x, rh.ray.org_y, rh.ray.org_z };
+			Vector3 d{ rh.ray.dir_x, rh.ray.dir_y, rh.ray.dir_z };
+			Vector3 new_hitPoint = org + d * rh.ray.tfar;
 			return isIlluminated(light, new_hitPoint, normal);
 		}
 		return false;
@@ -255,7 +255,7 @@ Color4f Raytracer::trace(RTCRay ray, int level ) {
 		Vector3 hit_vector = Vector3(ray_hit.ray.org_x, ray_hit.ray.org_y, ray_hit.ray.org_z) +
 			Vector3(ray_hit.ray.dir_x, ray_hit.ray.dir_y, ray_hit.ray.dir_z) * ray_hit.ray.tfar;
 
-		float n1, n2, attenuation_red, attenuation_green, attenuation_blue;
+		float n1, n2;// attenuation_red, attenuation_green, attenuation_blue;
 		
 		if (ray.time == IOR_AIR) {
 			n1 = IOR_AIR; // ray is in air
@@ -298,26 +298,26 @@ Color4f Raytracer::trace(RTCRay ray, int level ) {
 			reflection_ray = get_reflection_ray(direction_vector, normal_vector, hit_vector, n1);
 			reflection_color = trace(reflection_ray, level + 1);
 
+
+			attenuation.r = exp(-(1 - material->diffuse.x) * ray_hit.ray.tfar);
+			attenuation.g = exp(-(1 - material->diffuse.y) * ray_hit.ray.tfar);
+			attenuation.b = exp(-(1 - material->diffuse.z) * ray_hit.ray.tfar);
+
 			// refraction
 			refraction_ray = get_refraction_ray(direction_vector, normal_vector, n1, n2, hit_vector);
 			if (refraction_ray.dir_x == refraction_ray.dir_x) {
 				refraction_color = trace(refraction_ray, level + 1);
-
-				attenuation.r = exp(-(1 - material->diffuse.x) * ray_hit.ray.tfar);
-				attenuation.g = exp(-(1 - material->diffuse.y) * ray_hit.ray.tfar);
-				attenuation.b = exp(-(1 - material->diffuse.z) * ray_hit.ray.tfar);
 
 				// Q3 Lambert - Attenuation of Refracted Ray
 				// compute the ratio between reflection and refraction
 				cos1 = abs(normal_vector.DotProduct(v));
 				alpha = (n1 - n2) / (n1 + n2);
 				R = (alpha * alpha + (1 - (alpha * alpha))) * pow((1 - cos1), 5);
-				if (R != R)R = alpha * alpha; // if R==NaN
 
 				Color4f c = mix_srgb(reflection_color, refraction_color, R);
 				return Color4f{ c.r * attenuation.r, c.g * attenuation.g, c.b * attenuation.b, 1 };
 			}
-			return reflection_color;
+			return Color4f{ reflection_color.r*attenuation.r,reflection_color.g * attenuation.g,reflection_color.b * attenuation.b,1 };
 			
 			break;
 
@@ -427,7 +427,7 @@ int Raytracer::Ui()
 	//ImGui::Checkbox( "Demo Window", &show_demo_window ); // Edit bools storing our window open/close state
 	//ImGui::Checkbox( "Another Window", &show_another_window );
 
-	ImGui::SliderFloat( "float", &f, 0.0f, 1.0f ); // Edit 1 float using a slider from 0.0f to 1.0f 
+	ImGui::SliderFloat( "gamma", &f, 0.0f, 1.0f ); // Edit 1 float using a slider from 0.0f to 1.0f 
 	gamma_level = f;
 
 	//ImGui::ColorEdit3( "clear color", ( float* )&clear_color ); // Edit 3 floats representing a color
