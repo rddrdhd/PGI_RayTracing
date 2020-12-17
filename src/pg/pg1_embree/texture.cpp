@@ -1,5 +1,6 @@
 #include "stdafx.h"
 #include "texture.h"
+#include <iostream>
 Texture::Texture() { }
 Texture::Texture( const char * file_name )
 {
@@ -52,6 +53,14 @@ Texture::Texture( const char * file_name )
 	}	
 }
 
+Color3f Texture::get_pixel(int x, int y) {
+	int offset = y * scan_width_ + x * pixel_size_;
+	float b = data_[offset] / 255.0f;
+	float g = data_[offset + 1] / 255.0f;
+	float r = data_[offset + 2] / 255.0f;
+	return Color3f{ r, g, b };
+};
+
 Texture::~Texture()
 {	
 	/*if ( data_ )
@@ -65,19 +74,50 @@ Texture::~Texture()
 	}*/
 }
 
-Color3f Texture::get_texel( const float u, const float v ) const
+Color3f Texture::get_texel( const float u, const float v )
 {
-	//assert( ( u >= 0.0f && u <= 1.0f ) && ( v >= 0.0f && v <= 1.0f ) );	
-	
-	const int x = max( 0, min( width_ - 1, int( u * width_ ) ) );
-	const int y = max( 0, min( height_ - 1, int( v * height_ ) ) );
+	float x, y, Q11, Q21, Q12, Q22,final_r, final_g, final_b;
+	Color3f x1y1, x2y1, x1y2, x2y2, f_xy1, f_xy2;
+	int x1, x2, y1, y2;
 
-	const int offset = y * scan_width_ + x * pixel_size_;
-	const float b = data_[offset] / 255.0f;
-	const float g = data_[offset + 1] / 255.0f;
-	const float r = data_[offset + 2] / 255.0f;
+	x = u * float(width_);
+	y = v * float(height_);
+
+	x1 = floor(x);
+	x2 = ceil(x);
+	y1 = floor(y);
+	y2 = ceil(y);
+
+	if (x2 >= width_)x2 = 0.0f;
+	if (y2 >= height_)y2 = y1;
+	if (x1 == x2 && x1 != 0)x1--; else x2++;
+	if (y1 == y2 && y1 != 0)y1--; else y2++;
+
+	x1y1 = get_pixel(x1, y1);
+	x2y1 = get_pixel(x2, y1);
+	x1y2 = get_pixel(x1, y2);
+	x2y2 = get_pixel(x2, y2);
+
+	Q11 = float((x2 - x) / (x2 - x1));
+	Q21 = float((x - x1) / (x2 - x1));
+	Q12 = float((x2 - x) / (x2 - x1));
+	Q22 = float((x - x1) / (x2 - x1));
+
+	f_xy1 = Color3f{ 
+		x1y1.r * Q11 + x2y1.r * Q21, 
+		x1y1.g * Q11 + x2y1.g * Q21, 
+		x1y1.b * Q11 + x2y1.b * Q21 };
+
+	f_xy2 = Color3f{ 
+		x1y2.r * Q12 + x2y2.r * Q22, 
+		x1y2.g * Q12 + x2y2.g * Q22, 
+		x1y2.b * Q12 + x2y2.b * Q22 };
 	
-	return Color3f{ r, g, b };
+	final_r = f_xy1.r * ((y2 - y) / (y2 - y1)) + f_xy2.r * ((y - y1) / (y2 - y1));
+	final_g = f_xy1.g * ((y2 - y) / (y2 - y1)) + f_xy2.g * ((y - y1) / (y2 - y1));
+	final_b = f_xy1.b * ((y2 - y) / (y2 - y1)) + f_xy2.b * ((y - y1) / (y2 - y1));
+	
+	return Color3f{ final_r, final_g, final_b };
 }
 
 int Texture::width() const
@@ -89,3 +129,5 @@ int Texture::height() const
 {
 	return height_;
 }
+
+

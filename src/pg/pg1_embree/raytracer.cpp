@@ -64,7 +64,7 @@ void Raytracer::LoadScene(const std::string object_file_name, const std::string 
 	*/
 	// Bile svetlo
 	Vector3 white(1, 1, 1);
-	LightSource white_light(Vector3(500,100,0), white, white, white);
+	LightSource white_light(Vector3(-500,-100,500), white, white, white);
 	//LightSource white_light(Vector3(300,100,-100), white, white, white);
 	lights_.push_back(white_light);
 
@@ -350,8 +350,9 @@ Color4f Raytracer::trace(RTCRay ray, int level ) {
 			for (LightSource light : this->lights_) {
 				if (isIlluminated(light, hit_vector, normal_vector)) {
 					Vector3 light_vector, camera_vector;
+					
 					//  hit to light
-					light_vector = Vector3(hit_vector.x - light.position_.x, hit_vector.y - light.position_.y, hit_vector.z - light.position_.z);
+					light_vector = Vector3(light.position_.x- hit_vector.x ,  light.position_.y- hit_vector.y, light.position_.z- hit_vector.z);
 					light_vector.Normalize();
 					
 					//  camera to hit

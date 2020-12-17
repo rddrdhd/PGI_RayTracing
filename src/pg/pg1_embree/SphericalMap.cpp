@@ -23,5 +23,6 @@ Color4f SphericalMap::get_texel(const float x, const float y, const float z) con
 	Color3f c = this->texture_->get_texel(u, v);
 
 
+	//return Color4f{1,1,1,1};
 	return Color4f{c.b, c.g, c.r, 1};
 }

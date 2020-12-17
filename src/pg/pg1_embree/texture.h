@@ -16,9 +16,10 @@ class Texture
 public:
 	Texture();
 	Texture( const char * file_name );
+	Color3f get_pixel(int x, int y);
 	~Texture();
 
-	Color3f get_texel( const float u, const float v ) const;
+	Color3f get_texel(const float u, const float v);
 
 	int width() const;
 	int height() const;
