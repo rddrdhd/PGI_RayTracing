@@ -76,23 +76,31 @@ Texture::~Texture()
 
 Color3f Texture::get_texel( const float u, const float v )
 {
+	// Bilinear interpolation
 	float x, y, Q11, Q21, Q12, Q22,final_r, final_g, final_b;
 	Color3f x1y1, x2y1, x1y2, x2y2, f_xy1, f_xy2;
-	int x1, x2, y1, y2;
+	int tmp_x1, tmp_x2, tmp_y1, tmp_y2, x1, x2, y1, y2;
 
 	x = u * float(width_);
 	y = v * float(height_);
 
-	x1 = floor(x);
-	x2 = ceil(x);
-	y1 = floor(y);
-	y2 = ceil(y);
+	tmp_x1 = floor(x);
+	tmp_x2 = ceil(x);
+	tmp_y1 = floor(y);
+	tmp_y2 = ceil(y);
 
-	if (x2 >= width_)x2 = 0.0f;
+	/*if (x2 >= width_)x2 = 0.0f;
 	if (y2 >= height_)y2 = y1;
 	if (x1 == x2 && x1 != 0)x1--; else x2++;
-	if (y1 == y2 && y1 != 0)y1--; else y2++;
+	if (y1 == y2 && y1 != 0)y1--; else y2++;*/
+	x1 = int(tmp_x1);
+	 x2 = tmp_x2 == width_ ? 0 : int(tmp_x2);
+	y1 = int(tmp_y1);
+	y2 = (tmp_y2 == height_) ? int(tmp_y1) : int(tmp_y2);
 
+	if (x1 == x2 or y1 == y2) {
+		return Color3f{ 1,0,0 };
+	}
 	x1y1 = get_pixel(x1, y1);
 	x2y1 = get_pixel(x2, y1);
 	x1y2 = get_pixel(x1, y2);

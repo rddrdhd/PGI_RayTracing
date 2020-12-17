@@ -278,7 +278,7 @@ Color4f Raytracer::trace(RTCRay ray, int level ) {
 		return Color4f{ n.x, n.y,n.z, 1.0f };*/
 
 
-		if (level >= 20) { // 
+		if (level >= 10) { // 
 			return Color4f{ 0,0,0,1 };/*this->background_.get_texel(
 				direction_vector.x,
 				direction_vector.y,
@@ -394,7 +394,7 @@ Color4f Raytracer::trace(RTCRay ray, int level ) {
 
 Color4f Raytracer::get_pixel( const int x, const int y, const float t )
 {
-	const int ms_width = 3;
+	const int ms_width = 5;
 	int ms_total = pow(ms_width, 2);
 
 	//std::array<std::array<Color4f, ms_width>, ms_width> result_colors;
@@ -416,8 +416,9 @@ Color4f Raytracer::get_pixel( const int x, const int y, const float t )
 			float rand1 = uni_dist(generator);
 			float rand2 = uni_dist(generator);
 		
-			RTCRay primaryRay = camera_.GenerateRay(x + msX + rand1, y + msY + rand2, focalDistance, this->apertureSize);
-			result_colors[fieldX][fieldY] = trace(primaryRay, 0);
+			RTCRay primary_ray = camera_.GenerateRay(x + msX + rand1, y + msY + rand2, this->focalDistance, this->apertureSize);
+			primary_ray.time = IOR_AIR;
+			result_colors[fieldX][fieldY] = trace(primary_ray, 0);
 		}
 
 	}

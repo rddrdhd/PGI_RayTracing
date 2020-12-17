@@ -18,6 +18,7 @@ Color4f SphericalMap::get_texel(const float x, const float y, const float z) con
 {
 	// Q9 Environmental map
 	Vector3 vec{ x, z, y };
+	vec.Normalize();
 	float u = 0.5 + atan2(vec.x, vec.z) / (2 * M_PI);
 	float v = 0.5 - asin(vec.y) / M_PI;
 	Color3f c = this->texture_->get_texel(u, v);
