@@ -45,8 +45,8 @@ private:
 	std::vector<Material *> materials_;
 	std::vector<LightSource> lights_;
 	LightSource* ambient;
-	float apertureSize = 0.0f; 
-	float focalDistance = 125.0f;
+	float apertureSize = 1.0f; 
+	float focalDistance = 50.0f;
 	SphericalMap background_;
 	RTCDevice device_;
 	RTCScene scene_;

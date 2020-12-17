@@ -392,45 +392,45 @@ Color4f Raytracer::trace(RTCRay ray, int level ) {
 		direction_vector.z);
 }
 
-Color4f Raytracer::get_pixel( const int x, const int y, const float t )
-{
-	const int ms_width = 5;
-	int ms_total = pow(ms_width, 2);
+Color4f Raytracer::get_pixel( const int x_pixel_coord, const int y_pixel_coord, const float t ) {
+	const int sampling_width = 3; 
+	int sampling_area = pow(sampling_width, 2);
+	Color4f result_colors[sampling_width][sampling_width];
+	float rand1, rand2, new_x, new_y;
 
-	//std::array<std::array<Color4f, ms_width>, ms_width> result_colors;
-	Color4f result_colors[ms_width][ms_width];
-	// generate primary ray and perform ray cast on the scene
-	// TODO supersampling
-	if (ms_total == 1) {
-		RTCRay primary_ray = camera_.GenerateRay(x, y);
+	if (sampling_area == 1) {
+		RTCRay primary_ray = camera_.GenerateRay(x_pixel_coord, y_pixel_coord);
 		primary_ray.time = IOR_AIR;
 		return gamma(trace(primary_ray, 0));
-	}
-	for (int fieldX = 0; fieldX < ms_width; fieldX++) {
+	} else { //random
+		for (int x = 0; x < sampling_width; x++) {
+			for (int y = 0; y < sampling_width; y++) {
+				std::mt19937 generator(123);
+				std::uniform_real_distribution<float> uni_dist(-0.5f / sampling_width, 0.5f / sampling_width);
+				rand1 = uni_dist(generator);
+				rand2 = uni_dist(generator);
 
-		float msX = fieldX * (1.0f / ms_width);
-		for (int fieldY = 0; fieldY < ms_width; fieldY++) {
-			float msY = fieldY * (1.0f / ms_width);
-			std::mt19937 generator(123);
-			std::uniform_real_distribution<float> uni_dist(-0.5f / ms_width, 0.5f / ms_width);
-			float rand1 = uni_dist(generator);
-			float rand2 = uni_dist(generator);
-		
-			RTCRay primary_ray = camera_.GenerateRay(x + msX + rand1, y + msY + rand2, this->focalDistance, this->apertureSize);
-			primary_ray.time = IOR_AIR;
-			result_colors[fieldX][fieldY] = trace(primary_ray, 0);
+				new_x = x_pixel_coord + (x * (1.0f / sampling_width)) + rand1;
+				new_y = y_pixel_coord + (y * (1.0f / sampling_width)) + rand2;
+
+				RTCRay primary_ray = camera_.GenerateRay(new_x, new_y, this->focalDistance, this->apertureSize);
+				primary_ray.time = IOR_AIR; // where is the ray now - in air bc we cast it from camera
+				result_colors[x][y] = trace(primary_ray, 0);
+			}
 		}
+		Color4f tmpColor{ 0.0f, 0.0f, 0.0f, 1.0f };
+
+		// sum colors
+		for (int x = 0; x < sampling_width; x++) {
+			for (int y = 0; y < sampling_width; y++) {
+				tmpColor.r += result_colors[x][y].r;
+				tmpColor.g += result_colors[x][y].g;
+				tmpColor.b += result_colors[x][y].b;
+			}
+		}
+		return Color4f{ tmpColor.b / sampling_area, tmpColor.g / sampling_area, tmpColor.r / sampling_area, 1.0f };
 
 	}
-	Color4f tmpMultisamplingColor{ 0.0f, 0.0f, 0.0f, 1.0f };
-	for (int fieldX = 0; fieldX < ms_width; fieldX++) {
-		for (int fieldY = 0; fieldY < ms_width; fieldY++) {
-			tmpMultisamplingColor.r += result_colors[fieldX][fieldY].r;
-			tmpMultisamplingColor.g += result_colors[fieldX][fieldY].g;
-			tmpMultisamplingColor.b += result_colors[fieldX][fieldY].b;
-		}
-	}
-	return Color4f{ tmpMultisamplingColor.b/ ms_total, tmpMultisamplingColor.g /ms_total, tmpMultisamplingColor.r / ms_total, 1.0f };
 
 }
 
@@ -461,18 +461,21 @@ int Raytracer::Ui()
 
 	ImGui::SliderFloat( "gamma", &f, 0.0f, 1.0f ); // Edit 1 float using a slider from 0.0f to 1.0f 
 	gamma_level = f;
+	//ImGui::SliderFloat("aperture", &this->apertureSize, 0.0f, 5.0f); // Edit 1 float using a slider from 0.0f to 1.0f   
+	//ImGui::SliderFloat("focal point", &this->focalDistance, 50.0f, 300.0f); // Edit 1 float using a slider from 0.0f to 1.0f   
 
-	ImGui::Text("counter = %d", counter);
 
-	ImGui::SliderFloat("aperture", &this->apertureSize, 0.0f, 5.0f);
+	//ImGui::Text("counter = %d", &counter);
+	//this->apertureSize = counter;
+	//ImGui::SliderFloat("aperture", &this->apertureSize, 0.0f, 5.0f);
 
 	//ImGui::ColorEdit3( "clear color", ( float* )&clear_color ); // Edit 3 floats representing a color
 
 	// Buttons return true when clicked (most widgets return true when edited/activated)
-	if ( ImGui::Button( "Button" ) )
-		counter++;
-	ImGui::SameLine();
-	ImGui::Text( "counter = %d", counter );
+	//if ( ImGui::Button( "Button" ) )
+	//	counter++;
+	//ImGui::SameLine();
+	//ImGui::Text( "counter = %d", counter );
 
 	ImGui::Text( "Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate );
 	ImGui::End();
