@@ -229,7 +229,6 @@ RTCRay Raytracer::get_reflection_ray(Vector3 direction, Vector3 normal, Vector3 
 
 Color4f Raytracer::trace(RTCRay ray, int level ) {
 	
-	// TODO Q6 Bliliear interpolation http://mrl.cs.vsb.cz/people/fabian/pg1/pr03.pdf
 	// TODO Q11 Super Sampling, Q12 Depth of field,  Q13 Bounding Volume Hierarchy (construction and traversal), Q14 Surface Area Heuristic  http://mrl.cs.vsb.cz/people/fabian/pg1/pr04.pdf
 	
 	RTCRayHit ray_hit = get_ray_hit(ray, scene_);
@@ -279,7 +278,7 @@ Color4f Raytracer::trace(RTCRay ray, int level ) {
 		return Color4f{ n.x, n.y,n.z, 1.0f };*/
 
 
-		if (level >= 7) { // 
+		if (level >= 20) { // 
 			return Color4f{ 0,0,0,1 };/*this->background_.get_texel(
 				direction_vector.x,
 				direction_vector.y,
@@ -395,12 +394,43 @@ Color4f Raytracer::trace(RTCRay ray, int level ) {
 
 Color4f Raytracer::get_pixel( const int x, const int y, const float t )
 {
+	const int ms_width = 3;
+	int ms_total = pow(ms_width, 2);
+
+	//std::array<std::array<Color4f, ms_width>, ms_width> result_colors;
+	Color4f result_colors[ms_width][ms_width];
 	// generate primary ray and perform ray cast on the scene
 	// TODO supersampling
-	RTCRay primary_ray = camera_.GenerateRay(x, y);
-	primary_ray.time = IOR_AIR;
+	if (ms_total == 1) {
+		RTCRay primary_ray = camera_.GenerateRay(x, y);
+		primary_ray.time = IOR_AIR;
+		return gamma(trace(primary_ray, 0));
+	}
+	for (int fieldX = 0; fieldX < ms_width; fieldX++) {
 
-	return gamma(trace(primary_ray, 0));
+		float msX = fieldX * (1.0f / ms_width);
+		for (int fieldY = 0; fieldY < ms_width; fieldY++) {
+			float msY = fieldY * (1.0f / ms_width);
+			std::mt19937 generator(123);
+			std::uniform_real_distribution<float> uni_dist(-0.5f / ms_width, 0.5f / ms_width);
+			float rand1 = uni_dist(generator);
+			float rand2 = uni_dist(generator);
+		
+			RTCRay primaryRay = camera_.GenerateRay(x + msX + rand1, y + msY + rand2, focalDistance, this->apertureSize);
+			result_colors[fieldX][fieldY] = trace(primaryRay, 0);
+		}
+
+	}
+	Color4f tmpMultisamplingColor{ 0.0f, 0.0f, 0.0f, 1.0f };
+	for (int fieldX = 0; fieldX < ms_width; fieldX++) {
+		for (int fieldY = 0; fieldY < ms_width; fieldY++) {
+			tmpMultisamplingColor.r += result_colors[fieldX][fieldY].r;
+			tmpMultisamplingColor.g += result_colors[fieldX][fieldY].g;
+			tmpMultisamplingColor.b += result_colors[fieldX][fieldY].b;
+		}
+	}
+	return Color4f{ tmpMultisamplingColor.b/ ms_total, tmpMultisamplingColor.g /ms_total, tmpMultisamplingColor.r / ms_total, 1.0f };
+
 }
 
 Color4f Raytracer::gamma(Color4f input) {
@@ -430,6 +460,10 @@ int Raytracer::Ui()
 
 	ImGui::SliderFloat( "gamma", &f, 0.0f, 1.0f ); // Edit 1 float using a slider from 0.0f to 1.0f 
 	gamma_level = f;
+
+	ImGui::Text("counter = %d", counter);
+
+	ImGui::SliderFloat("aperture", &this->apertureSize, 0.0f, 5.0f);
 
 	//ImGui::ColorEdit3( "clear color", ( float* )&clear_color ); // Edit 3 floats representing a color
 

@@ -61,6 +61,47 @@ RTCRay PinHoleCamera::GenerateRay( const float x_i, const float y_i ) const
 	
 	return ray;
 }
+RTCRay PinHoleCamera::GenerateRay( const float x_i, const float y_i, const float focalDistance, const float apertureSize ) const
+{
+
+	Vector3 d_c(x_i - width_ / 2, height_ / 2 - y_i, -f_y_);
+	d_c.Normalize();
+	Vector3 d_c_ws = M_c_w_ * d_c;
+	d_c_ws.Normalize();
+	Vector3 focalPoint = Vector3{ view_from_.x, view_from_.y , view_from_.z } + Vector3{ d_c_ws } *focalDistance;
+
+	RTCRay ray = RTCRay();
+	std::mt19937 generator(123);
+	std::uniform_real_distribution<float> uni_dist(-apertureSize / 2.0f, apertureSize / 2.0f);
+	float rand1 = uni_dist(generator);
+	float rand2 = uni_dist(generator);
+	Vector3 originShift = M_c_w_ * Vector3{
+		rand1,
+		rand2,
+		0
+	};
+
+	ray.org_x = view_from_.x + originShift.x;
+	ray.org_y = view_from_.y + originShift.y;
+	ray.org_z = view_from_.z + originShift.z;
+
+	Vector3 nDir = focalPoint - Vector3{ ray.org_x, ray.org_y , ray.org_z };
+	nDir.Normalize();
+
+	ray.dir_x = nDir.x;
+	ray.dir_y = nDir.y;
+	ray.dir_z = nDir.z;
+
+	ray.tnear = FLT_MIN;
+	ray.tfar = FLT_MAX;
+	ray.time = 0.0f;
+
+	ray.mask = 0; // can be used to mask out some geometries for some rays
+	ray.id = 0; // identify a ray inside a callback function
+	ray.flags = 0; // reserved
+
+	return ray;
+}
 
 Vector3 PinHoleCamera::get_origin()
 {
