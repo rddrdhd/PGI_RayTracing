@@ -394,6 +394,9 @@ Color4f Raytracer::trace(RTCRay ray, int level ) {
 
 Color4f Raytracer::get_pixel( const int x_pixel_coord, const int y_pixel_coord, const float t ) {
 	const int sampling_width = 3; 
+
+	float focal_distance = 200.0f;
+	float radius_fr = 5.0f;
 	int sampling_area = pow(sampling_width, 2);
 	Color4f result_colors[sampling_width][sampling_width];
 	float rand1, rand2, new_x, new_y;
@@ -405,15 +408,15 @@ Color4f Raytracer::get_pixel( const int x_pixel_coord, const int y_pixel_coord, 
 	} else { //random
 		for (int x = 0; x < sampling_width; x++) {
 			for (int y = 0; y < sampling_width; y++) {
-				std::mt19937 generator(123);
-				std::uniform_real_distribution<float> uni_dist(-0.5f / sampling_width, 0.5f / sampling_width);
-				rand1 = uni_dist(generator);
-				rand2 = uni_dist(generator);
+				//std::mt19937 generator(std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch()).count());
+				//std::uniform_real_distribution<float> uni_dist(-0.5f / sampling_width, 0.5f / sampling_width);
+				//rand1 = uni_dist(generator);
+				//rand2 = uni_dist(generator);
 
-				new_x = x_pixel_coord + (x * (1.0f / sampling_width)) + rand1;
-				new_y = y_pixel_coord + (y * (1.0f / sampling_width)) + rand2;
+				new_x = x_pixel_coord + (x * (1.0f / sampling_width));// + rand1;
+				new_y = y_pixel_coord + (y * (1.0f / sampling_width));// + rand2;
 
-				RTCRay primary_ray = camera_.GenerateRay(new_x, new_y, this->focalDistance, this->apertureSize);
+				RTCRay primary_ray = camera_.GenerateRay(new_x, new_y, focal_distance, radius_fr);
 				primary_ray.time = IOR_AIR; // where is the ray now - in air bc we cast it from camera
 				result_colors[x][y] = trace(primary_ray, 0);
 			}

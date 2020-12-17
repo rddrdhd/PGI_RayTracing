@@ -61,40 +61,40 @@ RTCRay PinHoleCamera::GenerateRay( const float x_i, const float y_i ) const
 	
 	return ray;
 }
-RTCRay PinHoleCamera::GenerateRay( const float x_i, const float y_i, const float focal_length, const float aperture_size ) const
+RTCRay PinHoleCamera::GenerateRay( const float x_i, const float y_i, const float focal_length, const float aperture ) const
 {
 	Vector3 camera_ray_direction(x_i - width_ / 2, height_ / 2 - y_i, -f_y_);
 	camera_ray_direction.Normalize();
-	// to world coord system
-	Vector3 direction = M_c_w_ * camera_ray_direction;
-	direction.Normalize();
+	Vector3 direction_ws = M_c_w_ * camera_ray_direction;// to world coord system
+	direction_ws.Normalize();
 
 	// get the WS coordiantes of point P which lies on the primary ray at the distance fr (radius)
-	Vector3 focal_point = Vector3{ view_from_.x, view_from_.y , view_from_.z } + Vector3{ direction }*focal_length;
-
+	//Vector3 focal_point = Vector3{ view_from_.x, view_from_.y , view_from_.z } + Vector3{ direction }*focal_length;
+	Vector3 focal_point = Vector3{view_from_.x+direction_ws.x*focal_length, view_from_.y + direction_ws.y * focal_length , view_from_.z + direction_ws.z * focal_length } ;
+	
 	// in random manner shift the origin of the primary ray using the aperture size
-	std::mt19937 generator(123);
-	std::uniform_real_distribution<float> uni_dist(-aperture_size / 2.0f, aperture_size / 2.0f);
+	std::mt19937 generator(std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::system_clock::now().time_since_epoch()).count());
+	std::uniform_real_distribution<float> uni_dist(-aperture / 2.0f, aperture / 2.0f); 
 	float rand1 = uni_dist(generator);
 	float rand2 = uni_dist(generator);
 	Vector3 shift = M_c_w_ * Vector3{ rand1, rand2, 0 };
 
 	RTCRay ray = RTCRay();
-	ray.org_x = view_from_.x + shift.x;
-	ray.org_y = view_from_.y + shift.y;
-	ray.org_z = view_from_.z + shift.z;
+	ray.org_x = view_from_.x +shift.x;
+	ray.org_y = view_from_.y +shift.y;
+	ray.org_z = view_from_.z +shift.z;
 
 	// set the direction vector of the primary so that it goes through the focal point P
-	Vector3 new_direction = focal_point - Vector3{ ray.org_x, ray.org_y , ray.org_z };
+	Vector3 new_direction{ focal_point.x-ray.org_x,  focal_point.y - ray.org_y , focal_point.z - ray.org_z };
 	new_direction.Normalize();
 
 	ray.dir_x = new_direction.x;
 	ray.dir_y = new_direction.y;
-	ray.dir_z = new_direction.z;
+	ray.dir_z = new_direction.z;//aaaaaaaaaaaaaaaaaaaaa
 
 	ray.tnear = 0.01f;
 	ray.tfar = FLT_MAX;
-	ray.time = 0;
+	ray.time = 0.0f;
 
 	ray.mask = 0; // can be used to mask out some geometries for some rays
 	ray.id = 0; // identify a ray inside a callback function
