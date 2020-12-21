@@ -28,7 +28,7 @@ PinHoleCamera::PinHoleCamera( const int width, const int height, const float fov
 	M_c_w_ = Matrix3x3( x_c, y_c, z_c );
 }
 
-RTCRay PinHoleCamera::GenerateRay( const float x_i, const float y_i ) const
+RTCRay PinHoleCamera::generate_ray( const float x_i, const float y_i ) const
 {
 	RTCRay ray = RTCRay();
 
@@ -61,7 +61,8 @@ RTCRay PinHoleCamera::GenerateRay( const float x_i, const float y_i ) const
 	
 	return ray;
 }
-RTCRay PinHoleCamera::GenerateRay( const float x_i, const float y_i, const float focal_length, const float aperture ) const
+
+RTCRay PinHoleCamera::generate_ray( const float x_i, const float y_i, const float focal_length, const float aperture ) const
 {
 	Vector3 camera_ray_direction(x_i - width_ / 2, height_ / 2 - y_i, -f_y_);
 	camera_ray_direction.Normalize();
@@ -80,17 +81,17 @@ RTCRay PinHoleCamera::GenerateRay( const float x_i, const float y_i, const float
 	Vector3 shift = M_c_w_ * Vector3{ rand1, rand2, 0 };
 
 	RTCRay ray = RTCRay();
-	ray.org_x = view_from_.x +shift.x;
-	ray.org_y = view_from_.y +shift.y;
-	ray.org_z = view_from_.z +shift.z;
+	ray.org_x = view_from_.x + shift.x;
+	ray.org_y = view_from_.y + shift.y;
+	ray.org_z = view_from_.z + shift.z;
 
 	// set the direction vector of the primary so that it goes through the focal point P
-	Vector3 new_direction{ focal_point.x-ray.org_x,  focal_point.y - ray.org_y , focal_point.z - ray.org_z };
+	Vector3 new_direction{ focal_point.x - ray.org_x,  focal_point.y - ray.org_y , focal_point.z - ray.org_z };
 	new_direction.Normalize();
 
 	ray.dir_x = new_direction.x;
 	ray.dir_y = new_direction.y;
-	ray.dir_z = new_direction.z;//aaaaaaaaaaaaaaaaaaaaa
+	ray.dir_z = new_direction.z;
 
 	ray.tnear = 0.01f;
 	ray.tfar = FLT_MAX;

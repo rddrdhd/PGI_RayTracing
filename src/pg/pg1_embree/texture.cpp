@@ -58,7 +58,7 @@ Color3f Texture::get_pixel(int x, int y) {
 	float b = data_[offset] / 255.0f;
 	float g = data_[offset + 1] / 255.0f;
 	float r = data_[offset + 2] / 255.0f;
-	return Color3f{ r, g, b };
+	return Color3f{ b, g, r };
 };
 
 Texture::~Texture()
@@ -93,14 +93,15 @@ Color3f Texture::get_texel( const float u, const float v )
 	if (y2 >= height_)y2 = y1;
 	if (x1 == x2 && x1 != 0)x1--; else x2++;
 	if (y1 == y2 && y1 != 0)y1--; else y2++;*/
-	x1 = tmp_x1<1?int(tmp_x1)+1:int(tmp_x1);
-	 x2 = tmp_x2 == width_ ? 0 : int(tmp_x2);
-	y1 = tmp_y1 < 1 ? int(tmp_y1) + 1 : int(tmp_y1);
+	x1 = (tmp_x1<1)?int(tmp_x1)+1:int(tmp_x1);
+	x2 = (tmp_x2 == width_) ? 0 : int(tmp_x2);
+	y1 = (tmp_y1 < 1) ? int(tmp_y1) + 1 : int(tmp_y1);
 	y2 = (tmp_y2 == height_) ? int(tmp_y1) : int(tmp_y2);
 
 	if (x1 == x2 or y1 == y2) {
 		return Color3f{ 0,0,0 };
 	}
+
 	x1y1 = get_pixel(x1, y1);
 	x2y1 = get_pixel(x2, y1);
 	x1y2 = get_pixel(x1, y2);

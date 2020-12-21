@@ -65,7 +65,6 @@ void Raytracer::LoadScene(const std::string object_file_name, const std::string 
 	// Bile svetlo
 	Vector3 white(1, 1, 1);
 	LightSource white_light(Vector3(-500,-100,500), white, white, white);
-	//LightSource white_light(Vector3(300,100,-100), white, white, white);
 	lights_.push_back(white_light);
 
 	// surfaces loop
@@ -148,24 +147,32 @@ RTCRayHit get_ray_hit(RTCRay ray, RTCScene scene) {
 	return ray_hit;
 };
 
-bool Raytracer::isIlluminated(LightSource light, Vector3 hit_position, Vector3 normal)
+bool Raytracer::is_illuminated(LightSource light, Vector3 hit_position, Vector3 normal)
 {
-	RTCRay ray = light.GenerateRay(hit_position.x, hit_position.y, hit_position.z);
-	RTCRayHit rh = get_ray_hit(ray, scene_);
+	bool in_shadow;
+	Vector3 light_position{light.position_.x, light.position_.y, light.position_.z };
 
-	if (rh.hit.geomID != RTC_INVALID_GEOMETRY_ID) {
-		RTCGeometry geometry = rtcGetGeometry(scene_, rh.hit.geomID);
-		Material* material = (Material*)(rtcGetGeometryUserData(geometry));
-		if (material->type == 4) {
-			Vector3 org{ rh.ray.org_x, rh.ray.org_y, rh.ray.org_z };
-			Vector3 d{ rh.ray.dir_x, rh.ray.dir_y, rh.ray.dir_z };
-			Vector3 new_hitPoint = org + d * rh.ray.tfar;
-			return isIlluminated(light, new_hitPoint, normal);
+	if (normal.DotProduct(light_position) < 0) 
+		in_shadow = true;
+	else {
+		in_shadow = false;
+		float epsilon = 0.000009f;
+		Vector3 shadow_ray_direction = light_position - hit_position;
+		Vector3 shadow_ray_start = hit_position + epsilon * shadow_ray_direction;
+
+		RTCRay ray = light.GenerateRay(hit_position.x, hit_position.y, hit_position.z);
+		RTCRayHit ray_hit = get_ray_hit(ray, scene_);
+		// pokud mezi svetlem a hit_position nic není
+		if (ray_hit.hit.geomID != RTC_INVALID_GEOMETRY_ID) {
+			in_shadow = true;
+			RTCGeometry geometry = rtcGetGeometry(scene_, ray_hit.hit.geomID);
+			Material* material = (Material*)(rtcGetGeometryUserData(geometry));
+			if (material->type == 4) {
+				in_shadow = false;
+			}
 		}
-		return false;
 	}
-	// Q5 - Hard shadows
-	return true;// (ray_hit.hit.geomID != RTC_INVALID_GEOMETRY_ID);
+	return !in_shadow;
 }
 
 RTCRay Raytracer::get_refraction_ray(Vector3 direction, Vector3 normal, float n1, float n2, Vector3 hit_point)
@@ -241,20 +248,15 @@ Color4f Raytracer::trace(RTCRay ray, int level ) {
 	{
 		RTCGeometry geometry = rtcGetGeometry(scene_, ray_hit.hit.geomID);
 		Normal3f normal;
-
 		// get interpolated normal
 		rtcInterpolate0(geometry, ray_hit.hit.primID, ray_hit.hit.u, ray_hit.hit.v, RTC_BUFFER_TYPE_VERTEX_ATTRIBUTE, 0, &normal.x, 3);
-		
 		Material* material = (Material*)(rtcGetGeometryUserData(geometry));
-	
 		Vector3 normal_vector(normal.x, normal.y, normal.z);
 		normal_vector.Normalize();
-
 		// vypocitam misto hitu
 		Vector3 hit_vector = Vector3(ray_hit.ray.org_x, ray_hit.ray.org_y, ray_hit.ray.org_z) +
 			Vector3(ray_hit.ray.dir_x, ray_hit.ray.dir_y, ray_hit.ray.dir_z) * ray_hit.ray.tfar;
-
-		float n1, n2;// attenuation_red, attenuation_green, attenuation_blue;
+		float n1, n2;
 		
 		if (ray.time == IOR_AIR) {
 			n1 = IOR_AIR; // ray is in air
@@ -277,19 +279,19 @@ Color4f Raytracer::trace(RTCRay ray, int level ) {
 
 		return Color4f{ n.x, n.y,n.z, 1.0f };*/
 
-
-		if (level >= 10) { // 
-			return Color4f{ 0,0,0,1 };/*this->background_.get_texel(
+		if (level >= 7) { 
+			return Color4f{ 0,0,0,1 };
+			/*this->background_.get_texel(
 				direction_vector.x,
 				direction_vector.y,
 				direction_vector.z);*/
 		}
 
 		Vector3 v = -direction_vector;
-		float R, alpha, F0, cos1;
+		float R, alpha, cos1;
 
 		switch (material->type) {
-		case 4: // shader 4 = dielectric = reflection & refraction
+		case 4: // shader 4 = dielectric = reflection & refraction * attenaution
 			RTCRay reflection_ray, refraction_ray;
 			Color4f reflection_color, refraction_color, attenuation;
 
@@ -347,7 +349,7 @@ Color4f Raytracer::trace(RTCRay ray, int level ) {
 			}
 
 			for (LightSource light : this->lights_) {
-				if (isIlluminated(light, hit_vector, normal_vector)) {
+				if (is_illuminated(light, hit_vector, normal_vector)) {
 					Vector3 light_vector, camera_vector;
 					
 					//  hit to light
@@ -369,7 +371,6 @@ Color4f Raytracer::trace(RTCRay ray, int level ) {
 					m_s_g = material->specular.y;
 					m_s_b = material->specular.x;
 
-					//Vector3 l_r{ -light_vector.x, -light_vector.y, light_vector.z };
 					Vector3 l_r = 2 * (normal_vector.DotProduct(light_vector)) * normal_vector - light_vector;
 					l_r.Normalize();
 
@@ -393,48 +394,46 @@ Color4f Raytracer::trace(RTCRay ray, int level ) {
 }
 
 Color4f Raytracer::get_pixel( const int x_pixel_coord, const int y_pixel_coord, const float t ) {
+	// stratified sampling
 	const int sampling_width = 3; 
-
 	float focal_distance = 200.0f;
 	float radius_fr = 5.0f;
-	int sampling_area = pow(sampling_width, 2);
+	int sampling_area = (int)pow(sampling_width, 2);
 	Color4f result_colors[sampling_width][sampling_width];
 	float rand1, rand2, new_x, new_y;
 
-	if (sampling_area == 1) {
-		RTCRay primary_ray = camera_.GenerateRay(x_pixel_coord, y_pixel_coord);
-		primary_ray.time = IOR_AIR;
-		return gamma(trace(primary_ray, 0));
-	} else { //random
-		for (int x = 0; x < sampling_width; x++) {
-			for (int y = 0; y < sampling_width; y++) {
-				//std::mt19937 generator(std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch()).count());
-				//std::uniform_real_distribution<float> uni_dist(-0.5f / sampling_width, 0.5f / sampling_width);
-				//rand1 = uni_dist(generator);
-				//rand2 = uni_dist(generator);
+	for (int x = 0; x < sampling_width; x++) {
+		for (int y = 0; y < sampling_width; y++) {
+			std::mt19937 generator(std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::system_clock::now().time_since_epoch()).count());
+			std::uniform_real_distribution<float> uni_dist(-0.5f / sampling_width, 0.5f / sampling_width);
+			rand1 = uni_dist(generator);
+			rand2 = uni_dist(generator);
 
-				new_x = x_pixel_coord + (x * (1.0f / sampling_width));// + rand1;
-				new_y = y_pixel_coord + (y * (1.0f / sampling_width));// + rand2;
+			new_x = x_pixel_coord + (x * (1.0f / sampling_width)) + rand1;
+			new_y = y_pixel_coord + (y * (1.0f / sampling_width)) + rand2;
 
-				RTCRay primary_ray = camera_.GenerateRay(new_x, new_y, focal_distance, radius_fr);
-				primary_ray.time = IOR_AIR; // where is the ray now - in air bc we cast it from camera
-				result_colors[x][y] = trace(primary_ray, 0);
-			}
+			RTCRay primary_ray = camera_.generate_ray(new_x, new_y, focal_distance, radius_fr);
+			primary_ray.time = IOR_AIR; // where is the ray now - in air bc we cast it from camera
+			result_colors[x][y] = trace(primary_ray, 0);
 		}
-		Color4f tmpColor{ 0.0f, 0.0f, 0.0f, 1.0f };
-
-		// sum colors
-		for (int x = 0; x < sampling_width; x++) {
-			for (int y = 0; y < sampling_width; y++) {
-				tmpColor.r += result_colors[x][y].r;
-				tmpColor.g += result_colors[x][y].g;
-				tmpColor.b += result_colors[x][y].b;
-			}
-		}
-		return Color4f{ tmpColor.b / sampling_area, tmpColor.g / sampling_area, tmpColor.r / sampling_area, 1.0f };
-
 	}
 
+	// sum colors
+	Color4f final_color{ 0.0f, 0.0f, 0.0f, 1.0f };
+	for (int x = 0; x < sampling_width; x++) {
+		for (int y = 0; y < sampling_width; y++) {
+			final_color.r += result_colors[x][y].r;
+			final_color.g += result_colors[x][y].g;
+			final_color.b += result_colors[x][y].b;
+		}
+	}
+
+	return gamma(Color4f{ 
+		final_color.b / sampling_area, 
+		final_color.g / sampling_area, 
+		final_color.r / sampling_area, 1.0f 
+		});
+	
 }
 
 Color4f Raytracer::gamma(Color4f input) {

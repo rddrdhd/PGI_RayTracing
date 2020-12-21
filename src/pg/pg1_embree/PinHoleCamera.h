@@ -20,8 +20,8 @@ public:
 		const Vector3 view_from, const Vector3 view_at );
 
 	/* generate primary ray, top-left pixel image coordinates (xi, yi) are in the range <0, 1) x <0, 1) */
-	RTCRay GenerateRay( const float xi, const float yi ) const;
-	RTCRay GenerateRay(const float x_i, const float y_i, const float focal_lenght, const float aperture_size) const;
+	RTCRay generate_ray( const float xi, const float yi ) const;
+	RTCRay generate_ray(const float x_i, const float y_i, const float focal_lenght, const float aperture_size) const;
 	
 	Vector3 get_origin();
 	Vector3 get_direction();
